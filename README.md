@@ -1,6 +1,6 @@
-# 代码重构工具
+# CodeAgent
 
-自动检测 Python 代码中的坏味道，推荐修复方案，并自动修复。
+基于 Python AST 的代码重构智能体，自动检测坏味道，规划修复策略，执行修改，并循环检查结果。
 
 ## 它能做什么
 
@@ -38,6 +38,6 @@
 
 ## 与 AI 编程助手配合
 
-本工具做机械性重构（提取函数、重命名变量），AI 做语义复核。推荐与 OpenCode 等终端 AI 编程代理配合使用，形成"生成/修改 → 自动清洗 → AI 复核"的闭环。
+CodeAgent 做机械性重构（Review→Reflect→Refactor 循环），AI 做语义复核。推荐与 OpenCode 等终端 AI 编程代理配合使用，形成"生成/修改 → 自动清洗 → AI 复核"的闭环。
 
 详细集成方案见 [`docs/ai-integration.md`](docs/ai-integration.md)。

@@ -1,10 +1,10 @@
 # AI 集成指南
 
-本工具专做**机械性重构**（提取、改名、编译检查），AI 编程助手（如 OpenCode）擅长**语义理解**。两者组合可以形成"生成/修改 → 自动清洗 → AI 复核"的闭环，比各自单独用更可靠。
+CodeAgent 专做**机械性重构**（Review→Reflect→Refactor 循环），AI 编程助手（如 OpenCode）擅长**语义理解**。两者组合可以形成"生成/修改 → 自动清洗 → AI 复核"的闭环，比各自单独用更可靠。
 
 ## 为什么需要 AI
 
-工具的 verify 只检查语法（`py_compile`），不保证重构后的代码逻辑正确。例如提取函数时，如果新函数引用了外层作用域的变量，工具不会报错——编译仍然通过，但语义可能变了。AI 可以理解代码意图，发现这类问题。
+CodeAgent 的 Review 只检查语法（`py_compile`）和静态坏味道，不保证重构后的代码逻辑正确。例如提取函数时，如果新函数引用了外层作用域的变量，工具不会报错——编译仍然通过，但语义可能变了。AI 可以理解代码意图，发现这类问题。
 
 ---
 
@@ -44,21 +44,22 @@
 在项目根目录创建 `.opencode/commands/smell-fix.md`：
 
 ```markdown
-# smell-fix
+# code-cleanup
 
-扫描当前文件/目录的 Python 坏味道并自动修复。
+运行 CodeAgent 扫描当前文件/目录的 Python 坏味道并自动修复。
 
 ## 用法
 
-`/smell-fix [文件或目录路径]`
+`/code-cleanup [文件或目录路径]`
 
 ## 执行流程
 
 1. 确定工具路径：根据实际安装位置调整。如果是 `examples/default` 结构，执行 `python src/main.py <路径>`；否则替换为实际的可执行路径
-2. 运行工具扫描目标文件/目录
-3. 解析工具输出，提取以下信息：
+2. CodeAgent 自动执行 Review→Reflect→Refactor 循环
+3. 解析 Agent 输出，提取以下信息：
    - 发现了几个坏味道，分别是什么类型、在什么位置
    - 哪些修复成功，哪些失败
+   - 是否有增量坏味道（重构引入的新问题）
 4. 对每个成功的修复，读取修改前后的差异（`git diff`）
 5. 检查语义正确性：
    - 提取函数是否引用了外层变量
@@ -67,10 +68,12 @@
    ```
    ## 扫描结果：发现 2 个坏味道
    - long-function @ my_code.py:5-38 → extract-function ✅ 已修复
-   - long-parameter-list @ my_code.py:40 → 暂无可用的修复手法
+   - long-parameter-list @ my_code.py:40 → 跳过（无可用修复手法）
    
    ## 需注意
    提取的函数 `extracted_func` 访问了外部变量 `counter`，请确认逻辑正确。
+   
+   重构后引入了 1 个新坏味道：[long-function] L42-55，建议检视。
    ```
 7. 如果用户不满意某个修复，提供选项让用户选择是否还原
 
@@ -82,23 +85,24 @@
 
 ### 方式二：Pre-commit Hook
 
-将工具注册为 git pre-commit hook，在提交代码前自动触发：
+将 CodeAgent 注册为 git pre-commit hook，在提交代码前自动触发：
 
 ```yaml
 # .pre-commit-config.yaml
 -   repo: local
     hooks:
-    -   id: smell-fix
-        name: Fix Python code smells
+    -   id: code-cleanup
+        name: CodeAgent cleanup
         entry: python src/main.py
         language: system
         files: \.py$
 ```
 
-> **风险警告**：本工具没有 `--dry-run` 模式，注册为 pre-commit hook 后每次提交都会**直接修改文件**。建议先在单个文件上测试确认行为符合预期，再启用 hook。
+> **风险警告**：CodeAgent 没有 `--dry-run` 模式，注册为 pre-commit hook 后每次提交都会**直接修改文件**。建议先在单个文件上测试确认行为符合预期，再启用 hook。Agent 的无限循环保护会避免同一坏味道被反复修复，但不会阻止 hook 修改文件。
 
 ## 注意事项
 
-- 工具的编译检查通过 ≠ 重构正确。请始终让 AI（或你自己）复核语义。
-- 工具只改同一文件内的代码，跨文件重构需要 AI 额外处理。
-- 未配置 LLM API Key 时工具正常运作，但 AI 复核需要依赖自身的语义理解能力。
+- CodeAgent 的编译检查通过 ≠ 重构正确。请始终让 AI（或你自己）复核语义。
+- CodeAgent 只改同一文件内的代码，跨文件重构需要 AI 额外处理。
+- CodeAgent 有无限循环保护（成功和失败的修改都会被标记已尝试），但 AI 复核时仍需注意是否有反复修改同一段代码的风险。
+- 未配置 LLM API Key 时 CodeAgent 正常运作（L1 规则模式），但 AI 复核需要依赖自身的语义理解能力。
