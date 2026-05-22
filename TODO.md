@@ -6,9 +6,8 @@
 
 ### 阈值统一
 
-- [ ] `detectors.py` 将长函数阈值从 >30 改为 >30（确认即可，无需改代码）
+- [x] `detectors.py` 阈值确认：长函数 >30 行、长参数 >5 个、大类型 >10 方法/字段
 - [ ] `architecture.md` 更新 >50 为 >30，与代码一致
-- [ ] 确认长参数列表阈值 >5、大类型阈值 >10 方法/字段在两个文档中一致
 
 ### 检测入口统一
 
@@ -27,7 +26,9 @@
 
 ---
 
-## Phase 1 — 数据模型统一
+## Phase 1 — 数据模型统一（作用域：`apps/qtcloud-code`）
+
+> 属于生产 CLI `apps/qtcloud-code` 的工作项，`examples/default` 不阻塞等待。
 
 ### 共享数据模型
 
@@ -99,23 +100,15 @@
 
 ## Phase 4 — 多语言检测（只读）
 
-### TypeScriptDetector
+### TypeScriptDetector（作用域：`examples/default` 内）
 
-策略：两阶段检测，不创建自定义 eslint rule。只读不改。
+> 检测逻辑全部在 `integrated_tests/` 内实现，不侵入 `apps/qtcloud-code`。
 
-- [ ] 新建 `apps/qtcloud-code/src/cli/app/quality/detectors_ts.py`
-- [ ] 阶段一（类型检查）：实现 `run_tsc_check(source_path: str) → list[SmellReport]`：调用 `tsc --noEmit` 解析输出
-- [ ] 阶段二（结构性检测，正则）：
-  - [ ] `detect_long_function_ts(source: str) → list[SmellReport]`：正则扫描函数定义 + 大括号匹配算行数
-  - [ ] `detect_long_parameter_list_ts(source: str) → list[SmellReport]`：正则匹配函数签名，统计参数个数
-  - [ ] `detect_large_class_ts(source: str) → list[SmellReport]`：正则扫描 class 定义，统计方法数
-- [ ] 单元测试 `tests/test_detectors_ts.py`（mock subprocess 调用）
-
-### 检测路由
-
-- [ ] `apps/qtcloud-code/src/cli/app/quality/detectors.py` 新增 `scan_project` 统一入口
-- [ ] 按文件后缀路由：`.py` → `PythonDetector`，`.ts/.tsx` → `TypeScriptDetector`
-- [ ] 集成测试改为调用 `scan_project` 公共入口
-- [ ] 删除 `integrated_tests/_find_functions_ts` 和 `_find_classes_ts`
+- [ ] 新建 `integrated_tests/fixtures/sample_small.ts`（精简 fixture，替代 2157 行）
+- [ ] 新建 `integrated_tests/test_typescript_detection.py`
+- [ ] 阶段一（类型检查）：`tsc --noEmit` 调用，解析输出为结构性问题
+- [ ] 阶段二（结构性检测）：正则扫描函数定义、参数列表、class 方法数
+- [ ] `integrated_tests/conftest.py` 提供共享 fixture 路径
+- [ ] 删除 `integrated_tests/test_refactoring_pipeline.py` 中的 `_find_functions_ts` / `_find_classes_ts`
 
 
