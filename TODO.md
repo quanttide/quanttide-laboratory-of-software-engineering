@@ -6,7 +6,7 @@
 
 ### 知识库工件
 
-- [ ] 删除 `examples/default/examples/` 目录（`code_refactor.py` 已无用）
+- [ ] 删除 `examples/code_refactor.py`（已无用）或内联到 `knowledge.py`
 - [ ] 更新 `knowledge.py` 改为内联数据或指向归档位置
 
 ---
@@ -51,9 +51,4 @@
 - [ ] 阶段一（类型检查）：`tsc --noEmit` 调用，解析输出为结构性问题
 - [ ] 阶段二（结构性检测）：正则扫描函数定义、参数列表、class 方法数
 
----
 
-## 用户文档
-
-- [x] `docs/user-guide.md` — 文档结构规划
-- [x] `README.md` — 手写面向用户的 README，替换占位内容
