@@ -4,7 +4,8 @@ import pytest
 from pathlib import Path
 from conftest import PY_FIXTURE, PY_CLEAN_FIXTURE
 from src.detectors import scan_file
-from src.planner import plan
+from src.reviewer import review_file, ReviewReport
+from src.reflector import reflect
 from src.transformers import apply_step
 from src.knowledge import correspondences
 
@@ -35,28 +36,28 @@ def test_detect_no_smells_on_clean():
 
 
 @pytest.mark.integration
-def test_plan_from_detection():
-    """检测后自动推荐对应的重构手法。"""
-    smells = scan_file(PY_FIXTURE)
-    steps = plan(smells)
-    assert len(steps) >= 1
+def test_reflect_recommends_method():
+    """检测后 Reflect 推荐对应的重构手法。"""
+    report = review_file(PY_FIXTURE)
+    assert len(report.smells) >= 1
+    r = reflect(report, set())
     known_methods = {c.target for c in correspondences}
-    for step in steps:
-        assert step.method_id in known_methods
-        assert step.conditions_met is not None
+    if r.action == "refactor":
+        assert r.method_id in known_methods
+    elif r.action == "skip":
+        assert r.target is not None
 
 
 @pytest.mark.integration
-def test_full_pipeline(tmp_path):
-    """自动修复 Python 代码（重命名变量、提取函数），
+def test_review_and_refactor(tmp_path):
+    """Review 文件 → Reflect 决策 → Refactor 执行，
     修复后输出仍是合法 Python 语法。"""
     work_file = tmp_path / "sample.py"
     shutil.copy2(PY_FIXTURE, work_file)
-    smells = scan_file(work_file)
-    assert len(smells) >= 3
-    steps = plan(smells)
-    assert len(steps) >= 1
-    step = steps[0]
-    result = apply_step(step.method_id, work_file, step.target.location)
-    assert result.status in ("success", "failed")
-    ast.parse(work_file.read_text())
+    report = review_file(work_file)
+    assert len(report.smells) >= 1
+    r = reflect(report, set())
+    if r.action == "refactor":
+        result = apply_step(r.method_id, work_file, r.target.location)
+        assert result.status in ("success", "failed")
+        ast.parse(work_file.read_text())

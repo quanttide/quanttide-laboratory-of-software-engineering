@@ -1,4 +1,4 @@
-"""代码重构智能体 — 入口
+"""CodeAgent 入口
 
 用法：
     python src/main.py <路径>           # 扫描单个文件
@@ -9,7 +9,7 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.session import RefactoringSession
+from src.agent import CodeAgent
 
 
 USAGE = """用法: python src/main.py <文件路径|目录路径>
@@ -29,8 +29,8 @@ def main():
         print(f"路径不存在: {target}\n")
         print(USAGE)
         sys.exit(1)
-    session = RefactoringSession(target)
-    session.run()
+    agent = CodeAgent(target)
+    agent.run()
 
 
 if __name__ == "__main__":

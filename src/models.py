@@ -18,14 +18,6 @@ class SmellInstance:
 
 
 @dataclass
-class PlanStep:
-    method_id: str
-    target: SmellInstance
-    priority: int
-    conditions_met: bool
-
-
-@dataclass
 class AppliedMethod:
     method_id: str
     target: CodeLocation
@@ -34,9 +26,24 @@ class AppliedMethod:
 
 
 @dataclass
+class ReviewReport:
+    file: Path
+    source: str
+    smells: list[SmellInstance]
+    compile_ok: bool
+
+
+@dataclass
+class Reflection:
+    action: str  # "refactor" | "accept" | "skip" | "abort"
+    method_id: str | None = None
+    target: SmellInstance | None = None
+    reason: str = ""
+
+
+@dataclass
 class SessionState:
     project_root: Path
     smells: list[SmellInstance] = field(default_factory=list)
-    plan: list[PlanStep] = field(default_factory=list)
     applied: list[AppliedMethod] = field(default_factory=list)
     branch: str | None = None
