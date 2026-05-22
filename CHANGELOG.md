@@ -14,11 +14,22 @@
 - `_check_condition` / `verify()` 增加 `file.exists() and file.is_absolute()` 守卫，禁止读取相对路径/不存在文件
 - 将残留的 `test.py` 从项目根目录移至 `tests/fixtures/`，移除 `.gitignore` 中 `test.py` 条目
 
+### 集成测试重构
+
+- 新建 `conftest.py` — 共享 fixture 路径 + pytest mark 注册（`@pytest.mark.integration`、`@pytest.mark.llm`）
+- 新建 `test_python_pipeline.py` — 4 个端到端测试（检测完整性、误报、plan 映射、全流水线 + ast.parse 语法验证）
+- 新建 `test_fixtures.py` — 3 个 fixture 自检
+- 新建 `fixtures/sample.py`（Python 坏味道对照）和 `fixtures/clean.py`（干净对照）
+- `test_refactoring_pipeline.py` 删除正则解析函数（`_find_functions_ts` / `_find_classes_ts`），改为只做 fixture 自检
+- `test_detectors.py` `test_scan_file_ignores_short_code` 改用 `tmp_path` 根治 `test.py` 残留
+
 ### 文档
 
 - 新增 `docs/quanttide.md` — quanttide + quanttide-agent API 用法教程
 - 重写 ROADMAP 测试策略章节为「集成测试设计」，含 4 阶段实施计划
 - 更新 TODO.md 新增 Phase LLM 小节
+- 删除过时架构文档（`agent-cognition.md`、`architecture.md`、`index.md`）
+- `quanttide.md` 移至 `assets/`
 
 ## 2026-05-22
 
