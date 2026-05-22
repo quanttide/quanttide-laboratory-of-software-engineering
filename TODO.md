@@ -55,10 +55,5 @@
 
 ## 用户文档
 
-### 脚本生成 README
-
-- [ ] 新建 `scripts/generate_readme.py`：从集成测试断言提取描述，组装为面向用户的 README
-- [ ] README 结构：身份卡 → 三步走（发现/规划/修复）→ 信任底线 → 能力边界
-- [ ] 每节内容映射到对应集成测试（`test_detect_smells_on_fixture` 等）
-- [ ] 脚本写入 `README.md`，替换当前 2 行占位内容
-- [ ] CI 步骤：`pytest integrated_tests/ && python scripts/generate_readme.py`
+- [x] `docs/user-guide.md` — 文档结构规划
+- [x] `README.md` — 手写面向用户的 README，替换占位内容
