@@ -10,8 +10,8 @@ from src import llm_client
 class RefactoringSession:
 
     def __init__(self, target: Path):
-        self.target = target
-        self.state = SessionState(project_root=target if target.is_dir() else target.parent)
+        self.target = target.resolve()
+        self.state = SessionState(project_root=self.target if self.target.is_dir() else self.target.parent)
         self._backups: dict[str, str] = {}
 
     def run(self):
@@ -70,7 +70,7 @@ class RefactoringSession:
 
     def verify(self, result) -> bool:
         target = result.target.file
-        if not target.exists() or not target.is_absolute():
+        if not target.exists():
             return True
         try:
             r = subprocess.run(["python", "-m", "py_compile", str(target)], capture_output=True, timeout=10)
