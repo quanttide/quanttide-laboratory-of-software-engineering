@@ -2,30 +2,17 @@
 
 > 由 ROADMAP.md 拆解为具体代办。格式：`[ ] <phase> <area> <description>`。
 
-## Phase 0 — CodeAgent
+## Phase 0 — CodeAgent（代码重构已完成，测试已通过）
 
-### 核心模块
-
-- [x] `src/models.py` 新增 `ReviewReport`、`Reflection` 数据类
-- [x] 新建 `src/reviewer.py` — `review(source, baseline?) → ReviewReport`
-- [x] 新建 `src/reflector.py` — `reflect(report, context) → Reflection`；L1 纯规则 + L2 LLM 增强
-- [x] 新建 `src/agent.py` — CodeAgent 类，`review()`/`reflect()`/`refactor()`/`run()` 四个方法
-- [x] 删除 `src/planner.py`、`src/llm_client.py`、`src/session.py`
-
-### AST 清理
+### AST 清理（还未做）
 
 - [ ] `transform_rename_variable` 从 `ast.unparse` 改为字符串操作 + `ruff format`
 - [ ] `transform_extract_function` 修 return 处理和缩进偏移 edge case
 
-### 知识库清理
+### 知识库清理（还未做）
 
 - [ ] 删除 `examples/code_refactor.py`，数据内联到 `knowledge.py`
 - [ ] 更新 `knowledge.py` 改为内联数据，移除 `sys.path.insert`
-
-### 测试
-
-- [ ] 更新 `tests/` 单元测试适配新架构
-- [ ] 更新 `integrated_tests/` 集成测试适配新架构
 
 ---
 
