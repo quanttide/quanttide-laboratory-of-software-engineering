@@ -6,11 +6,16 @@
 
 ### 核心模块
 
-- [ ] `src/models.py` 新增 `ReviewReport`、`Reflection` 数据类
-- [ ] 新建 `src/reviewer.py` — `review(source, baseline?) → ReviewReport`
-- [ ] 新建 `src/reflector.py` — `reflect(report, context) → Reflection`；L1 纯规则 + L2 LLM 增强
-- [ ] 新建 `src/agent.py` — CodeAgent 类，`review()`/`reflect()`/`refactor()`/`run()` 四个方法
-- [ ] 删除 `src/planner.py`、`src/llm_client.py`、`src/session.py`
+- [x] `src/models.py` 新增 `ReviewReport`、`Reflection` 数据类
+- [x] 新建 `src/reviewer.py` — `review(source, baseline?) → ReviewReport`
+- [x] 新建 `src/reflector.py` — `reflect(report, context) → Reflection`；L1 纯规则 + L2 LLM 增强
+- [x] 新建 `src/agent.py` — CodeAgent 类，`review()`/`reflect()`/`refactor()`/`run()` 四个方法
+- [x] 删除 `src/planner.py`、`src/llm_client.py`、`src/session.py`
+
+### AST 清理
+
+- [ ] `transform_rename_variable` 从 `ast.unparse` 改为字符串操作 + `ruff format`
+- [ ] `transform_extract_function` 修 return 处理和缩进偏移 edge case
 
 ### 知识库清理
 
@@ -35,18 +40,20 @@
 
 ## Phase 2 — Transformers 扩展（Python）
 
+> AST 仅用于分析阶段。代码输出统一用字符串操作 + `ruff format`。
+
 ### Python extract-class（同一文件内）
 
 - [ ] `transformers.py` 新增 `transform_extract_class(source, location) → str`
-- [ ] 聚类策略：扫描 `self.<field>` 引用频率 → 构建方法-字段邻接矩阵 → 按共用字段数聚类
-- [ ] 生成新 class 定义 + 原 class 委托调用
+- [ ] AST 分析：扫描 `self.<field>` 引用频率 → 构建方法-字段邻接矩阵 → 按共用字段数聚类
+- [ ] 字符串输出：生成新 class 定义 + 原 class 委托调用 + `ruff format`
 - [ ] 单元测试 `tests/test_transformers.py` 新增 3-5 个测试用例
 
 ### Python move-function（同一文件内）
 
 - [ ] `transformers.py` 新增 `transform_move_function(source, target_class) → str`
-- [ ] 分析源函数的引用上下文（`self`、类字段、其他方法调用）
-- [ ] 生成目标 class 方法 + 原处委托
+- [ ] AST 分析：引用上下文（`self`、类字段、其他方法调用）
+- [ ] 字符串输出：目标 class 方法 + 原处委托 + `ruff format`
 - [ ] 单元测试
 
 

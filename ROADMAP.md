@@ -36,10 +36,24 @@ CodeAgent 采用 Review→Reflect→Refactor 循环：review 观察代码状态 
 | 回滚机制的持久化改进 | 内存备份对 demo 够用，不用过度工程 |
 | tree-sitter AST 全量解析 | 成本被严重低估，改用 CLI wrapper 策略 |
 | TS 变换（extract-class / move-function 等） | 主力写 Python，TS 只读不改。TS 变换无可靠工程方案 |
+| `ast.unparse` 做代码生成 | 丢失注释/空行/格式。用字符串操作 + `ruff format` 替代 |
 
 ---
 
-## 技术路线选择：多语言检测策略
+## 技术路线选择 A：AST 角色定位 — 分析用 AST，修改不用
+
+| 环节 | 做法 | 理由 |
+|------|------|------|
+| 检测/分析 | `ast.parse` + `ast.walk`（只读） | AST 天然适合理解代码结构，只读无副作用 |
+| 代码输出 | 字符串操作 + `ruff format` 兜底 | `ast.unparse` 丢失注释/空行/括号风格，不可用于生产级修改 |
+| 变量引用分析 | AST `_find_params` | 纯分析，符合 AST 定位 |
+| 类/方法边界识别 | AST 遍历找 `ClassDef`/`FunctionDef` | 纯分析，符合 AST 定位 |
+
+**结论**：AST 停在分析层。所有修改操作的"输出"阶段用字符串操作 + 格式化工具，不用 `NodeTransformer` + `unparse`。
+
+当前 `rename-variable` 在用 `ast.unparse` 输出代码，需要切换到字符串操作 + `ruff format`。
+
+## 技术路线选择 B：多语言检测策略
 
 两种路线，选择 **B**：
 
@@ -54,9 +68,9 @@ CodeAgent 采用 Review→Reflect→Refactor 循环：review 观察代码状态 
 
 ## 阶段路线图
 
-### Phase 0 — CodeAgent
+### Phase 0 — CodeAgent + AST 清理
 
-目标：从线性流水线（Scan→Plan→Execute→Verify）重构为 CodeAgent（Review→Reflect→Refactor）。
+目标：从线性流水线重构为 CodeAgent，同时修复 AST 滥用问题。
 
 - 新建 `agent.py` — CodeAgent 类，提供 `review()`、`reflect()`、`refactor()`、`run()` 四个方法
 - 新建 `reviewer.py` — 合并 scan + verify，支持无 baseline 的全量检查和有 baseline 的增量坏味道检测
@@ -64,6 +78,7 @@ CodeAgent 采用 Review→Reflect→Refactor 循环：review 观察代码状态 
 - 重写 `session.py` — 删除，功能并入 agent.py
 - 删除 `planner.py`、`llm_client.py`（功能并入 reflector 和 agent）
 - 删除 `examples/code_refactor.py`，数据内联到 `knowledge.py` 或归档
+- `transform_rename_variable` 从 `ast.unparse` 改为字符串操作 + `ruff format` 兜底
 
 ### Phase 1 — Reflector L2 增强（LLM）
 
@@ -80,8 +95,10 @@ CodeAgent 采用 Review→Reflect→Refactor 循环：review 观察代码状态 
 
 交付标准放宽：接受同一文件内简单场景，跨文件场景标记为"未来工作"。
 
-- 实现 `extract-class`（同一文件内）：基于 AST 引用分析做字段/方法内聚性聚类
-- 实现 `move-function`（同一文件内）
+**AST 角色**：AST 仅用于分析阶段（聚类、引用推断）。代码输出统一用字符串操作 + `ruff format`。
+
+- 实现 `extract-class`（同一文件内）：AST 分析字段/方法引用矩阵，字符串操作输出新 class + 委托
+- 实现 `move-function`（同一文件内）：AST 分析引用上下文，字符串操作输出目标 class 方法 + 原处委托
 
 ---
 
