@@ -70,6 +70,7 @@ class CodeAgent:
 
             if result.status == "success":
                 self.state.applied.append(result)
+                self._tried.add(_smell_key(reflection.target))
                 print(f"  OK {reflection.method_id} 已应用")
                 new_report = self.review(reflection.target.location.file)
                 new_smells = [s for s in new_report.smells if _smell_key(s) not in {_smell_key(x) for x in report.smells}]

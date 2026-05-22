@@ -4,18 +4,16 @@ import pytest
 from pathlib import Path
 from conftest import PY_FIXTURE, PY_CLEAN_FIXTURE
 from src.detectors import scan_file
-from src.reviewer import review_file, ReviewReport
+from src.reviewer import review_file
 from src.reflector import reflect
 from src.transformers import apply_step
 from src.knowledge import correspondences
+from src.agent import CodeAgent
 
 
 @pytest.mark.integration
 def test_detect_smells_on_fixture():
-    """检测 Python 代码中的三种坏味道：
-    - 过长函数（超过 30 行）
-    - 过长参数列表（超过 5 个参数）
-    - 过大类（超过 10 个方法或超过 10 个字段）"""
+    """检测 Python 代码中的三种坏味道。"""
     smells = scan_file(PY_FIXTURE)
     smell_ids = {s.smell_id for s in smells}
     assert "long-function" in smell_ids
@@ -50,8 +48,7 @@ def test_reflect_recommends_method():
 
 @pytest.mark.integration
 def test_review_and_refactor(tmp_path):
-    """Review 文件 → Reflect 决策 → Refactor 执行，
-    修复后输出仍是合法 Python 语法。"""
+    """Review 文件 → Reflect 决策 → Refactor 执行。"""
     work_file = tmp_path / "sample.py"
     shutil.copy2(PY_FIXTURE, work_file)
     report = review_file(work_file)
@@ -61,3 +58,26 @@ def test_review_and_refactor(tmp_path):
         result = apply_step(r.method_id, work_file, r.target.location)
         assert result.status in ("success", "failed")
         ast.parse(work_file.read_text())
+
+
+@pytest.mark.integration
+def test_agent_run_fix_smells(tmp_path):
+    """CodeAgent 完整 run() 循环：Review → Reflect → Refactor。"""
+    work_file = tmp_path / "sample.py"
+    shutil.copy2(PY_FIXTURE, work_file)
+    agent = CodeAgent(work_file)
+    agent.run()
+    assert len(agent.state.applied) >= 1
+    for a in agent.state.applied:
+        assert a.status == "success"
+    ast.parse(work_file.read_text())
+
+
+@pytest.mark.integration
+def test_agent_run_clean_file(tmp_path):
+    """对干净的代码，run() 不执行任何重构。"""
+    clean_file = tmp_path / "clean.py"
+    shutil.copy2(PY_CLEAN_FIXTURE, clean_file)
+    agent = CodeAgent(clean_file)
+    agent.run()
+    assert len(agent.state.applied) == 0
