@@ -3,10 +3,21 @@ from pathlib import Path
 from src.models import CodeLocation, SmellInstance
 
 
+def _get_functions(tree: ast.AST) -> list[ast.FunctionDef | ast.AsyncFunctionDef]:
+    funcs = []
+    for node in ast.iter_child_nodes(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            funcs.append(node)
+        elif isinstance(node, ast.ClassDef):
+            for item in node.body:
+                if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    funcs.append(item)
+    return funcs
+
+
 def detect_long_function(tree: ast.AST, file: Path) -> list[SmellInstance]:
     results = []
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+    for node in _get_functions(tree):
             line_count = node.end_lineno - node.lineno
             if line_count > 30:
                 results.append(SmellInstance(
@@ -20,8 +31,7 @@ def detect_long_function(tree: ast.AST, file: Path) -> list[SmellInstance]:
 
 def detect_long_parameter_list(tree: ast.AST, file: Path) -> list[SmellInstance]:
     results = []
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+    for node in _get_functions(tree):
             param_count = len(node.args.args)
             if param_count > 5:
                 results.append(SmellInstance(
@@ -35,7 +45,7 @@ def detect_long_parameter_list(tree: ast.AST, file: Path) -> list[SmellInstance]
 
 def detect_large_class(tree: ast.AST, file: Path) -> list[SmellInstance]:
     results = []
-    for node in ast.walk(tree):
+    for node in ast.iter_child_nodes(tree):
         if isinstance(node, ast.ClassDef):
             method_count = sum(1 for n in node.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)))
             field_count = sum(1 for n in node.body if isinstance(n, ast.Assign))

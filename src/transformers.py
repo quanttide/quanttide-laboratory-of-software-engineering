@@ -73,7 +73,11 @@ def transform_extract_function(source: str, location: CodeLocation, func_name: s
 
     new_func_lines = [
         f"{' ' * base_indent}def {func_name}({param_str}):\n",
-        *[f"{' ' * (base_indent + 4)}{line.lstrip()}" for line in target_lines],
+        *[
+            f"{' ' * (base_indent + 4 + indent_relative)}{text}"
+            for line in target_lines
+            for indent_relative, text in [(len(line) - len(line.lstrip()) - base_indent, line.lstrip())]
+        ],
     ]
     call_line = f"{' ' * base_indent}{func_name}({param_str})\n"
 
