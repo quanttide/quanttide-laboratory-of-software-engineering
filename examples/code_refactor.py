@@ -2,8 +2,8 @@
 
 用法：
     from docs.gallery.wisdom.code_refactor import (
-        RefactorMethod, CodeSmell, RefactorGoal,
-        refactoring_techniques, code_smells,
+        RefactorMethod, CodeSmell, RefactorGoal, Correspondence,
+        refactoring_techniques, code_smells, correspondences,
     )
 """
 
@@ -56,6 +56,15 @@ class SafetyNet(BaseModel):
     label: str
     requirement: str = Field(description="要求")
     tools: list[str] = Field(description="工具/技术")
+
+
+class Correspondence(BaseModel):
+    """实例间对应关系 — 从问题到解决方案的有向连接。"""
+    id: str
+    name: str
+    label: str
+    source: str = Field(description="源实例 id（问题）")
+    target: str = Field(description="目标实例 id（解决方案）")
 
 
 refactoring_techniques = [
@@ -202,9 +211,49 @@ safety_nets = [
 ]
 
 
+correspondences = [
+    Correspondence(
+        id="long-function-to-extract-function",
+        name="long-function-to-extract-function",
+        label="从过长函数到提炼函数",
+        source="long-function",
+        target="extract-function",
+    ),
+    Correspondence(
+        id="duplicate-code-to-extract-method",
+        name="duplicate-code-to-extract-method",
+        label="从重复代码到提取公共方法",
+        source="duplicate-code",
+        target="extract-function",
+    ),
+    Correspondence(
+        id="large-class-to-extract-class",
+        name="large-class-to-extract-class",
+        label="从大而全的类到提炼类",
+        source="large-class",
+        target="extract-class",
+    ),
+    Correspondence(
+        id="long-parameter-list-to-introduce-parameter-object",
+        name="long-parameter-list-to-introduce-parameter-object",
+        label="从过长参数列表到引入参数对象",
+        source="long-parameter-list",
+        target="preserve-whole-object",
+    ),
+    Correspondence(
+        id="mysterious-name-to-rename",
+        name="mysterious-name-to-rename",
+        label="从神秘命名到重命名",
+        source="shotgun-surgery",
+        target="rename-variable",
+    ),
+]
+
+
 if __name__ == "__main__":
     print(f"重构手法: {len(refactoring_techniques)} 项")
     print(f"代码坏味道: {len(code_smells)} 项")
     print(f"重构目标: {len(refactor_goals)} 项")
     print(f"重构流程: {len(refactor_processes)} 项")
     print(f"重构安全网: {len(safety_nets)} 项")
+    print(f"实例间对应: {len(correspondences)} 项")
