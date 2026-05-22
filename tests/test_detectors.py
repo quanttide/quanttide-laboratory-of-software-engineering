@@ -108,9 +108,9 @@ class Big:
     assert len(good) == 0
 
 
-def test_scan_file_ignores_short_code():
+def test_scan_file_ignores_short_code(tmp_path):
     code = "x = 1\n"
-    file = Path("test.py")
+    file = tmp_path / "short.py"
     file.write_text(code)
     results = scan_file(file)
     assert len(results) == 0
