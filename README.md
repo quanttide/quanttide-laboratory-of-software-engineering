@@ -35,3 +35,9 @@
 - 只处理 Python 代码。TypeScript 可检测但不可修复
 - 只处理同一文件内的重构，不涉及跨文件修改
 - 不依赖外部 LLM，未配置 API Key 时所有功能正常运行
+
+## 与 AI 编程助手配合
+
+本工具做机械性重构（提取函数、重命名变量），AI 做语义复核。推荐与 OpenCode 等终端 AI 编程代理配合使用，形成"生成/修改 → 自动清洗 → AI 复核"的闭环。
+
+详细集成方案见 [`docs/user-guide.md`](docs/user-guide.md#与-ai-编程工具配合以-opencode-为例)。
