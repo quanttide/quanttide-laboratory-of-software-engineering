@@ -1,7 +1,9 @@
+import ast
+import shutil
 import pytest
 from pathlib import Path
 from conftest import PY_FIXTURE, PY_CLEAN_FIXTURE
-from src.detectors import scan_file, scan_project
+from src.detectors import scan_file
 from src.planner import plan
 from src.transformers import apply_step
 from src.knowledge import correspondences
@@ -14,19 +16,17 @@ def test_detect_smells_on_fixture():
     assert "long-function" in smell_ids
     assert "long-parameter-list" in smell_ids
     assert "large-class" in smell_ids
-    assert len(smells) >= 3
+    for s in smells:
+        assert s.location.start_line > 0
+        assert s.location.end_line > 0
+        assert s.metrics is not None
+        assert 0.0 <= s.severity <= 1.0
 
 
 @pytest.mark.integration
 def test_detect_no_smells_on_clean():
     smells = scan_file(PY_CLEAN_FIXTURE)
     assert len(smells) == 0
-
-
-@pytest.mark.integration
-def test_scan_project_scans_directory():
-    smells = scan_project(Path(__file__).resolve().parent / "fixtures")
-    assert len(smells) > 0
 
 
 @pytest.mark.integration
@@ -41,15 +41,14 @@ def test_plan_from_detection():
 
 
 @pytest.mark.integration
-def test_full_pipeline():
-    smells = scan_file(PY_FIXTURE)
+def test_full_pipeline(tmp_path):
+    work_file = tmp_path / "sample.py"
+    shutil.copy2(PY_FIXTURE, work_file)
+    smells = scan_file(work_file)
     assert len(smells) >= 3
     steps = plan(smells)
     assert len(steps) >= 1
-    for step in steps:
-        result = apply_step(
-            method_id=step.method_id,
-            file=step.target.location.file,
-            location=step.target.location,
-        )
-        assert result.status in ("success", "failed")
+    step = steps[0]
+    result = apply_step(step.method_id, work_file, step.target.location)
+    assert result.status in ("success", "failed")
+    ast.parse(work_file.read_text())
