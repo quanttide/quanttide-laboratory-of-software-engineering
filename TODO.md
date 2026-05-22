@@ -2,15 +2,15 @@
 
 > 由 ROADMAP.md 拆解为具体代办。格式：`[ ] <phase> <area> <description>`。
 
-## Phase 0 — Reflection Agent
+## Phase 0 — CodeAgent
 
 ### 核心模块
 
 - [ ] `src/models.py` 新增 `ReviewReport`、`Reflection` 数据类
-- [ ] 新建 `src/reviewer.py` — `review(source, baseline?) → ReviewReport`，合并 scan + verify 能力，含增量坏味道检测
-- [ ] 新建 `src/reflector.py` — `reflect(report, context) → Reflection`；L1 纯规则 + L2 LLM 增强两级决策
-- [ ] 重写 `src/session.py` — while 循环：Review → Reflect → Refactor → Review
-- [ ] 删除 `src/planner.py`、`src/llm_client.py`
+- [ ] 新建 `src/reviewer.py` — `review(source, baseline?) → ReviewReport`
+- [ ] 新建 `src/reflector.py` — `reflect(report, context) → Reflection`；L1 纯规则 + L2 LLM 增强
+- [ ] 新建 `src/agent.py` — CodeAgent 类，`review()`/`reflect()`/`refactor()`/`run()` 四个方法
+- [ ] 删除 `src/planner.py`、`src/llm_client.py`、`src/session.py`
 
 ### 知识库清理
 

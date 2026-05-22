@@ -13,17 +13,17 @@
 
 ## 取舍建议
 
-### 核心判断：做"反思智能体（Reflection Agent）"，不做"大而全的认知智能体"
+### 核心判断：做"CodeAgent"，不做"大而全的认知智能体"
 
 上一版说"不做智能体，做流水线"——这是对 6 元认知模型过度设计的矫枉过正。实际问题是旧架构（Scan→Plan→Execute→Verify）没有反馈回路，失败后不会换策略，不会反思。
 
-智能体的价值不在"认知模型多完整"，而在"能否根据执行结果调整下一步"。采用 Reflection 架构：Review 观察 → Reflect 决策 → Refactor 执行 → 循环。
+CodeAgent 采用 Review→Reflect→Refactor 循环：review 观察代码状态 → reflect 决定怎么做 → refactor 执行修改，然后再次 review 检查结果。
 
 ### 要做什么
 
 | 优先级 | 项目 | 原因 |
 |--------|------|------|
-| P0 | **Reflection Agent 架构重构**：Review→Reflect→Refactor 循环 | 旧架构无反馈回路，失败不换策略。这是所有后续能力的基础 |
+| P0 | **CodeAgent**：agent.py 提供 review/reflect/refactor/run 四个方法 | 旧架构无反馈回路，失败不换策略。这是所有后续能力的基础 |
 | P1 | Reflector L1（无 LLM） | 确定性规则保障离线/CI 下循环可运行，不卡死 |
 | P2 | Reflector L2（LLM 增强） | LLM 驱动策略重试、失败归因、自然语言解释 |
 | P3 | Transformers 扩展（Python） | 新增 extract-class、move-function |
@@ -54,14 +54,15 @@
 
 ## 阶段路线图
 
-### Phase 0 — Reflection Agent 架构
+### Phase 0 — CodeAgent
 
-目标：从线性流水线（Scan→Plan→Execute→Verify）重构为反思循环（Review→Reflect→Refactor）。
+目标：从线性流水线（Scan→Plan→Execute→Verify）重构为 CodeAgent（Review→Reflect→Refactor）。
 
+- 新建 `agent.py` — CodeAgent 类，提供 `review()`、`reflect()`、`refactor()`、`run()` 四个方法
 - 新建 `reviewer.py` — 合并 scan + verify，支持无 baseline 的全量检查和有 baseline 的增量坏味道检测
-- 新建 `reflector.py` — L1（纯规则）保证循环不卡死+L2（LLM 增强）智能决策策略重试和失败归因
-- 重写 `session.py` — while 循环替代线性执行
-- 删除 `planner.py`（功能并入 reflector）、`llm_client.py`（功能并入 reflector）
+- 新建 `reflector.py` — L1（纯规则）保证循环不卡死 + L2（LLM 增强）智能决策
+- 重写 `session.py` — 删除，功能并入 agent.py
+- 删除 `planner.py`、`llm_client.py`（功能并入 reflector 和 agent）
 - 删除 `examples/code_refactor.py`，数据内联到 `knowledge.py` 或归档
 
 ### Phase 1 — Reflector L2 增强（LLM）
