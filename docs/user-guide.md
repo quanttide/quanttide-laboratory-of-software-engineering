@@ -13,11 +13,43 @@
 
 ## 怎么运行
 
+需要在项目目录下执行：
+
 ```bash
+cd examples/default
 python src/main.py <文件路径|目录路径>
 ```
 
-支持单个文件或整个目录。工具会自动扫描路径下所有 `.py` 文件。
+支持单个文件或整个目录。不加参数或传 `--help` 会打印用法。
+
+### 运行后会输出什么
+
+```
+=== Scan: my_code.py ===
+发现 2 个坏味道
+
+  [long-function] my_code.py:5-38  severity=0.36  {'line_count': 33}
+  [long-parameter-list] my_code.py:40  severity=0.40  {'param_count': 7}
+
+=== Plan ===
+规划了 1 步重构
+
+  1. extract-function -> long-function @ L5  priority=64  condition=OK
+
+=== Execute ===
+FAIL extract-class 失败，已回退
+OK extract-function 已应用
+
+=== Done ===
+成功: 1 步
+失败: 1 步
+```
+
+### 它会改我的文件吗
+
+会。工具会直接修改目标文件，不会停下来确认。但每次修改后会自动编译检查，语法不通过会撤销本次修改。
+
+建议先在测试文件上试用。
 
 ---
 
@@ -50,7 +82,12 @@ python src/main.py <文件路径|目录路径>
 
 ## 安全保证
 
-每次修改后会自动运行 `python -m py_compile` 检查语法。如果编译失败，修改会被撤销。
+每次修改后会自动运行 `python -m py_compile` 检查语法。如果编译失败，本次修改会被撤销。
+
+注意：
+- 编译检查只能发现语法错误，无法发现逻辑错误
+- 单步修改失败不会影响已成功的修改（不整体回滚）
+- 运行结束后不自动还原文件（不同于 demo 模式）
 
 ---
 
@@ -59,4 +96,5 @@ python src/main.py <文件路径|目录路径>
 - 只支持 Python。不处理 TypeScript/JavaScript。
 - 只处理同一文件内的重构。不涉及跨文件修改。
 - 没有交互式界面。不会停下来等你确认。
-- 没有 `--help`、`--dry-run` 等命令行参数。
+- 没有 `--dry-run` 等预览参数。`--help` 支持，展示用法后退出。
+- 运行结束后不自动还原文件。
