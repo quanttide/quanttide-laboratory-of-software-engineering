@@ -2,38 +2,6 @@
 
 > 由 ROADMAP.md 拆解为具体代办。格式：`[ ] <phase> <area> <description>`。
 
----
-
-## Phase LLM — LLM 集成（基于 quanttide-agent）
-
-> 已实现，覆盖 ROADMAP 原"不做 LLM 集成"决策。
-
-### LLM 客户端
-
-- [x] 新建 `src/llm_client.py` — 基于 `quanttide-agent` 的 LLM 封装，全局复用 `LLM` 实例
-- [x] 实现 `check_condition(condition, code, metrics) → bool`：重构前置条件判断
-- [x] 实现 `suggest_variable_name(code, old_name) → str | None`：变量名智能建议
-- [x] 实现 `verify_semantic(original, modified) → tuple[bool, str]`：重构语义一致性验证
-- [x] 降级策略：所有 LLM 调用 try/except 兜底，未配置 API Key 时行为不变
-
-### 重构前条件检查
-
-- [x] `planner.py` `_check_condition` 从恒 `True` 改为读取源码 → `llm_client.check_condition`
-- [x] 无法读取文件时静默返回 `True`（不阻塞）
-
-### 变量名智能建议
-
-- [x] `transformers.py` 新增 `_llm_suggest_rename`：优先 LLM 建议，失败后 `_infer_rename_target` 硬编码兜底
-- [x] `apply_step("rename-variable")` 双路径：`_llm_suggest_rename or _infer_rename_target`
-
-### 语义验证
-
-- [x] `session.py` `verify()` 在 `py_compile` 通过后追加 LLM 语义一致性验证
-- [x] `_backup()` 保存原始内容供 LLM 比对
-- [x] 无原始内容时跳过 LLM 验证
-
----
-
 ## Phase 0 — 清理不一致
 
 ### 阈值统一
@@ -44,9 +12,12 @@
 
 ### 检测入口统一
 
-- [ ] `integrated_tests/test_refactoring_pipeline.py` 删除 `_find_functions_ts` 和 `_find_classes_ts` 正则函数
-- [ ] 新增 `TypeScriptDetector` stub（Phase 2 实现），集成测试改为调用它
-- [ ] 添加 pytest mark 标记集成测试（`@pytest.mark.integration`），与单元测试分离
+> 按 ROADMAP「集成测试设计」实施，不单独处理。
+
+- [ ] 按 ROADMAP 集成测试设计重建 `integrated_tests/` 目录结构
+- [ ] 新建 `test_python_pipeline.py` + `fixtures/sample.py` + `test_fixtures.py`
+- [ ] `conftest.py` 提供共享 fixture 路径
+- [ ] 添加 pytest mark 标记（`@pytest.mark.integration`、`@pytest.mark.llm`）
 
 ### 知识库工件
 
@@ -110,15 +81,14 @@
 
 ### 条件检查
 
-- [ ] `planner.py` 定义 `ConditionCheck` 枚举：`LONG_FUNCTION`、`LONG_PARAMS`、`LARGE_CLASS`
-- [ ] `_check_condition` 改为匹配枚举 + 执行对应检查逻辑
-- [ ] `code_refactor.py` `RefactorMethod.condition` 标记为 `@deprecated`（保留作为知识文档）
+- [x] `_check_condition` 改用 LLM 判定（`llm_client.check_condition`），弃用恒 True
+- [ ] 处理失败来源判断：重构前运行 baseline 检查，重构后对比增量
+- [ ] 单元测试 `tests/test_verifier.py`
 
 ### Verify 阶段（L1：编译/类型检查）
 
-- [ ] `session.py` `verify()` 扩展：Python 文件调用 `python -m py_compile`
-- [ ] 处理失败来源判断：重构前运行 baseline 检查，重构后对比增量
-- [ ] 单元测试 `tests/test_verifier.py`
+- [x] `session.py` `verify()`：`py_compile` 编译检查
+- [x] `session.py` `verify()` 追加 LLM 语义一致性验证
 
 ### 验证分级（L2：未来）
 
