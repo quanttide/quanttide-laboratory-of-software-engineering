@@ -1,5 +1,8 @@
 # ROADMAP
 
+> 项目约定、文件边界和维护规则见 `.agents/skills/code-context/SKILL.md`。
+> ROADMAP 遵循 SKILL.md 的文档流转规则：已完成项目移入 CHANGELOG，仅保留待实施内容。
+
 ## 假设
 
 1. `examples/default/` 是研究原型，探索"知识驱动的自主重构智能体"——设计有野心，但实现只有 Python 且不完整。
@@ -50,6 +53,7 @@
 ### Phase 0 — 清理不一致
 
 - 删除 `examples/code_refactor.py`（已稳定无用），数据内联到 `knowledge.py` 或归档
+- `.agents/skills/code-context/SKILL.md` 中的文档流转规则（ROADMAP→TODO→CHANGELOG）已建立并遵循，无需额外工作
 
 ### Phase 2 — Transformers 扩展（Python）
 
