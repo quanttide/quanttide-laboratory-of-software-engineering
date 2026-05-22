@@ -4,6 +4,36 @@
 
 ---
 
+## Phase LLM — LLM 集成（基于 quanttide-agent）
+
+> 已实现，覆盖 ROADMAP 原"不做 LLM 集成"决策。
+
+### LLM 客户端
+
+- [x] 新建 `src/llm_client.py` — 基于 `quanttide-agent` 的 LLM 封装，全局复用 `LLM` 实例
+- [x] 实现 `check_condition(condition, code, metrics) → bool`：重构前置条件判断
+- [x] 实现 `suggest_variable_name(code, old_name) → str | None`：变量名智能建议
+- [x] 实现 `verify_semantic(original, modified) → tuple[bool, str]`：重构语义一致性验证
+- [x] 降级策略：所有 LLM 调用 try/except 兜底，未配置 API Key 时行为不变
+
+### 重构前条件检查
+
+- [x] `planner.py` `_check_condition` 从恒 `True` 改为读取源码 → `llm_client.check_condition`
+- [x] 无法读取文件时静默返回 `True`（不阻塞）
+
+### 变量名智能建议
+
+- [x] `transformers.py` 新增 `_llm_suggest_rename`：优先 LLM 建议，失败后 `_infer_rename_target` 硬编码兜底
+- [x] `apply_step("rename-variable")` 双路径：`_llm_suggest_rename or _infer_rename_target`
+
+### 语义验证
+
+- [x] `session.py` `verify()` 在 `py_compile` 通过后追加 LLM 语义一致性验证
+- [x] `_backup()` 保存原始内容供 LLM 比对
+- [x] 无原始内容时跳过 LLM 验证
+
+---
+
 ## Phase 0 — 清理不一致
 
 ### 阈值统一

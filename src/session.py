@@ -4,6 +4,7 @@ from src.models import SessionState
 from src.detectors import scan_project, scan_file
 from src.planner import plan
 from src.transformers import apply_step
+from src import llm_client
 
 
 class RefactoringSession:
@@ -65,9 +66,6 @@ class RefactoringSession:
                 print(f"\n--- diff: {a.method_id} ---")
                 print(a.result_diff[:500])
 
-    def _backup(self, file: Path):
-        self._backups[str(file)] = file.read_text()
-
     def _restore_all(self):
         for path_str, content in self._backups.items():
             Path(path_str).write_text(content)
@@ -75,9 +73,23 @@ class RefactoringSession:
     def verify(self, result) -> bool:
         try:
             r = subprocess.run(["python", "-m", "py_compile", str(result.target.file)], capture_output=True, timeout=10)
-            return r.returncode == 0
+            if r.returncode != 0:
+                return False
         except Exception:
             return True
+        modified = result.target.file.read_text()
+        if not hasattr(self, '_original') or result.target.file not in self._original:
+            return True
+        original = self._original[result.target.file]
+        is_ok, _ = llm_client.verify_semantic(original, modified)
+        return is_ok
+
+    def _backup(self, file: Path):
+        content = file.read_text()
+        self._backups[str(file)] = content
+        if not hasattr(self, '_original'):
+            self._original = {}
+        self._original[file] = content
 
     def rollback_step(self, result):
         path = str(result.target.file)

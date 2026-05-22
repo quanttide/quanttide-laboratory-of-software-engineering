@@ -2,6 +2,7 @@ import ast
 import subprocess
 from pathlib import Path
 from src.models import CodeLocation, AppliedMethod
+from src import llm_client
 
 
 def transform_rename_variable(source: str, old_name: str, new_name: str) -> str:
@@ -104,12 +105,28 @@ def _suggest_name(old: str, context: ast.FunctionDef) -> str:
     return suggestions.get(old, "renamed")
 
 
+def _llm_suggest_rename(source: str) -> tuple[str, str] | None:
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return None
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            for n in ast.walk(node):
+                if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store):
+                    if len(n.id) == 1:
+                        new_name = llm_client.suggest_variable_name(source, n.id)
+                        if new_name:
+                            return n.id, new_name
+    return None
+
+
 def apply_step(method_id: str, file: Path, location: CodeLocation) -> AppliedMethod:
     source = file.read_text()
     new_source = None
 
     if method_id == "rename-variable":
-        pair = _infer_rename_target(source)
+        pair = _llm_suggest_rename(source) or _infer_rename_target(source)
         if pair is None:
             return AppliedMethod(method_id=method_id, target=location, result_diff="", status="failed")
         old_name, new_name = pair

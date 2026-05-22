@@ -1,5 +1,6 @@
 from src.models import SmellInstance, PlanStep
 from src.knowledge import find_method, correspondences
+from src import llm_client
 
 
 def _calc_priority(smell: SmellInstance) -> int:
@@ -29,4 +30,10 @@ def plan(smells: list[SmellInstance]) -> list[PlanStep]:
 
 
 def _check_condition(condition: str, smell: SmellInstance) -> bool:
-    return True
+    if not condition:
+        return True
+    try:
+        code = smell.location.file.read_text()
+    except (OSError, IOError):
+        return True
+    return llm_client.check_condition(condition, code, str(smell.metrics))
