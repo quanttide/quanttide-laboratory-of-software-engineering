@@ -80,6 +80,7 @@ class CodeAgent:
                         print(f"    [{s.smell_id}] {s.location.file.name}:{s.location.start_line}")
                 report = new_report
             else:
+                self.state.applied.append(result)
                 self._rollback(result)
                 self._tried.add(_smell_key(reflection.target))
                 print(f"  FAIL {reflection.method_id} 失败，已回退")

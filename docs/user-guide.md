@@ -28,19 +28,19 @@ python src/main.py <文件路径|目录路径>
 
 ```
 === Review: my_code.py ===
-  [long-function] my_code.py:5-38  severity=0.36
-  [long-parameter-list] my_code.py:40  severity=0.40
+  [large-class] my_code.py:1-48  severity=0.65
+  [long-function] my_code.py:50-83  severity=0.41
 
-重构 [long-function] → extract-function  (severity=0.36)
+重构 [large-class] → extract-class  (severity=0.65)
+  FAIL extract-class 失败，已回退
+重构 [long-function] → extract-function  (severity=0.41)
   OK extract-function 已应用
-
-重构 [long-parameter-list] → skip (无可用修复手法)
 
 接受：所有坏味道已处理或跳过
 
 === Done ===
 成功: 1 步
-失败: 0 步
+失败: 1 步
 ```
 
 ### 它会改我的文件吗
