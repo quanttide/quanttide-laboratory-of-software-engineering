@@ -55,8 +55,6 @@ class RefactoringSession:
                 self.rollback_step(result)
                 print(f"FAIL {step.method_id} 失败，已回退")
 
-        self._restore_all()
-
         print(f"\n=== Done ===")
         print(f"成功: {sum(1 for a in self.state.applied if a.status == 'success')} 步")
         print(f"失败: {sum(1 for a in self.state.applied if a.status == 'failed')} 步")
