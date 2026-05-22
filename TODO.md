@@ -2,12 +2,34 @@
 
 > 由 ROADMAP.md 拆解为具体代办。格式：`[ ] <phase> <area> <description>`。
 
-## Phase 0 — 清理不一致
+## Phase 0 — Reflection Agent 架构
 
-### 知识库工件
+### 核心模块
 
-- [ ] 删除 `examples/code_refactor.py`（已无用）或内联到 `knowledge.py`
-- [ ] 更新 `knowledge.py` 改为内联数据或指向归档位置
+- [ ] `src/models.py` 新增 `ReviewReport`、`Reflection` 数据类
+- [ ] 新建 `src/reviewer.py` — `review(source, baseline?) → ReviewReport`，合并 scan + verify 能力，含增量坏味道检测
+- [ ] 新建 `src/reflector.py` — `reflect(report, context) → Reflection`；L1 纯规则 + L2 LLM 增强两级决策
+- [ ] 重写 `src/session.py` — while 循环：Review → Reflect → Refactor → Review
+- [ ] 删除 `src/planner.py`、`src/llm_client.py`
+
+### 知识库清理
+
+- [ ] 删除 `examples/code_refactor.py`，数据内联到 `knowledge.py`
+- [ ] 更新 `knowledge.py` 改为内联数据，移除 `sys.path.insert`
+
+### 测试
+
+- [ ] 更新 `tests/` 单元测试适配新架构
+- [ ] 更新 `integrated_tests/` 集成测试适配新架构
+
+---
+
+## Phase 1 — Reflector L2 增强（LLM）
+
+- [ ] 失败归因：LLM 分析失败原因是策略不对还是代码太复杂 → 换策略重试
+- [ ] 增量坏味道权衡：LLM 判断新坏味道比原来的更轻，接受还是继续重构
+- [ ] 循环终止判断：LLM 判定"当前状态可接受"，主动结束循环
+- [ ] 自然语言解释：每次 Reflection 输出人类可读的决策理由
 
 ---
 
@@ -26,29 +48,5 @@
 - [ ] 分析源函数的引用上下文（`self`、类字段、其他方法调用）
 - [ ] 生成目标 class 方法 + 原处委托
 - [ ] 单元测试
-
----
-
-## Phase 3 — 真实验证
-
-### 条件检查
-
-- [ ] 处理失败来源判断：重构前运行 baseline 检查，重构后对比增量
-
-### 验证分级（L2：未来）
-
-- [ ] 设计中预留 L2 扩展点（运行项目测试）
-- [ ] L2 默认关闭，用户通过 `--verify-level 2` 显式启用
-
----
-
-## Phase 4 — 多语言检测（只读）
-
-### TypeScriptDetector
-
-- [ ] 新建 `integrated_tests/fixtures/sample_small.ts`（精简 fixture，替代 2157 行）
-- [ ] 新建 `integrated_tests/test_typescript_detection.py`
-- [ ] 阶段一（类型检查）：`tsc --noEmit` 调用，解析输出为结构性问题
-- [ ] 阶段二（结构性检测）：正则扫描函数定义、参数列表、class 方法数
 
 
