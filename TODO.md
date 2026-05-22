@@ -2,7 +2,7 @@
 
 > 由 ROADMAP.md 拆解为具体代办。格式：`[ ] <phase> <area> <description>`。
 
-## Phase 0 — Reflection Agent 架构
+## Phase 0 — Reflection Agent
 
 ### 核心模块
 

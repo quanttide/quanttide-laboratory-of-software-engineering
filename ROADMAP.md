@@ -15,7 +15,7 @@
 
 ### 核心判断：做"反思智能体（Reflection Agent）"，不做"大而全的认知智能体"
 
-上一版说"不做智能体，做流水线"——这是对 6 元认知模型过度设计的矫枉过正。实际问题是：流水线（Scan→Plan→Execute→Verify）没有反馈回路，失败后不会换策略，不会反思。
+上一版说"不做智能体，做流水线"——这是对 6 元认知模型过度设计的矫枉过正。实际问题是旧架构（Scan→Plan→Execute→Verify）没有反馈回路，失败后不会换策略，不会反思。
 
 智能体的价值不在"认知模型多完整"，而在"能否根据执行结果调整下一步"。采用 Reflection 架构：Review 观察 → Reflect 决策 → Refactor 执行 → 循环。
 
@@ -23,7 +23,7 @@
 
 | 优先级 | 项目 | 原因 |
 |--------|------|------|
-| P0 | **3R 架构重构**：Review→Reflect→Refactor 循环 | 当前流水线无反馈回路，失败不换策略。这是所有后续能力的基础 |
+| P0 | **Reflection Agent 架构重构**：Review→Reflect→Refactor 循环 | 旧架构无反馈回路，失败不换策略。这是所有后续能力的基础 |
 | P1 | Reflector L1（无 LLM） | 确定性规则保障离线/CI 下循环可运行，不卡死 |
 | P2 | Reflector L2（LLM 增强） | LLM 驱动策略重试、失败归因、自然语言解释 |
 | P3 | Transformers 扩展（Python） | 新增 extract-class、move-function |
