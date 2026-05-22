@@ -40,4 +40,4 @@
 
 本工具做机械性重构（提取函数、重命名变量），AI 做语义复核。推荐与 OpenCode 等终端 AI 编程代理配合使用，形成"生成/修改 → 自动清洗 → AI 复核"的闭环。
 
-详细集成方案见 [`docs/user-guide.md`](docs/user-guide.md#与-ai-编程工具配合以-opencode-为例)。
+详细集成方案见 [`docs/ai-integration.md`](docs/ai-integration.md)。
