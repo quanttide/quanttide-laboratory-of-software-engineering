@@ -9,4 +9,3 @@ venv/
 *.egg-info/
 dist/
 build/
-test.py

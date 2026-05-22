@@ -32,8 +32,8 @@ def plan(smells: list[SmellInstance]) -> list[PlanStep]:
 def _check_condition(condition: str, smell: SmellInstance) -> bool:
     if not condition:
         return True
-    try:
-        code = smell.location.file.read_text()
-    except (OSError, IOError):
+    file = smell.location.file
+    if not file.exists() or not file.is_absolute():
         return True
+    code = file.read_text()
     return llm_client.check_condition(condition, code, str(smell.metrics))

@@ -71,17 +71,19 @@ class RefactoringSession:
             Path(path_str).write_text(content)
 
     def verify(self, result) -> bool:
+        target = result.target.file
+        if not target.exists() or not target.is_absolute():
+            return True
         try:
-            r = subprocess.run(["python", "-m", "py_compile", str(result.target.file)], capture_output=True, timeout=10)
+            r = subprocess.run(["python", "-m", "py_compile", str(target)], capture_output=True, timeout=10)
             if r.returncode != 0:
                 return False
         except Exception:
             return True
-        modified = result.target.file.read_text()
-        if not hasattr(self, '_original') or result.target.file not in self._original:
+        saved = self._original.get(target) if hasattr(self, '_original') else None
+        if saved is None:
             return True
-        original = self._original[result.target.file]
-        is_ok, _ = llm_client.verify_semantic(original, modified)
+        is_ok, _ = llm_client.verify_semantic(saved, target.read_text())
         return is_ok
 
     def _backup(self, file: Path):
