@@ -24,39 +24,7 @@
 - [ ] 删除 `examples/default/examples/` 目录（`code_refactor.py` 已无用）
 - [ ] 更新 `knowledge.py` 改为内联数据或指向归档位置
 
----
 
-## Phase 1 — 数据模型统一（作用域：`apps/qtcloud-code`）
-
-> 属于生产 CLI `apps/qtcloud-code` 的工作项，`examples/default` 不阻塞等待。
-
-### 共享数据模型
-
-- [ ] 新建 `apps/qtcloud-code/src/cli/app/quality/models.py`
-- [ ] 定义 `SmellReport` 数据类（最小公共接口），字段：
-  - `source: Path` / `language: Literal["python", "typescript"]` / `detector: str`
-  - `location: CodeLocation` / `severity: float` / `detail: str` / `raw_output: str`
-- [ ] 定义 `DetectResult` 数据类（检测结果，含 `SmellReport[]` + `passed`）
-- [ ] 定义 `PlanStep` 数据类（引用自 `examples/default/src/models.py`）
-- [ ] 定义 `AppliedMethod` 数据类（引用自 `examples/default/src/models.py`）
-
-### 审计适配
-
-- [ ] `audit.py` `AuditResult` 新增 `to_smell_reports()` 转换方法
-- [ ] `audit.py` `run()` 返回 `DetectResult` 而非仅 `AuditResult`
-- [ ] `cli.py` `audit` 命令适配新返回类型
-
-### 检测器适配
-
-- [ ] `detectors.py` `scan_file` / `scan_project` 返回 `list[SmellReport]` 而非 `list[SmellInstance]`
-- [ ] 更新 `tests/test_detectors.py` 适配新返回类型
-
-### Planner 适配
-
-- [ ] `planner.py` `plan()` 消费 `list[SmellReport]`
-- [ ] 更新 `tests/test_planner.py`
-
----
 
 ## Phase 2 — Transformers 扩展（Python）
 
@@ -100,9 +68,7 @@
 
 ## Phase 4 — 多语言检测（只读）
 
-### TypeScriptDetector（作用域：`examples/default` 内）
-
-> 检测逻辑全部在 `integrated_tests/` 内实现，不侵入 `apps/qtcloud-code`。
+### TypeScriptDetector
 
 - [ ] 新建 `integrated_tests/fixtures/sample_small.ts`（精简 fixture，替代 2157 行）
 - [ ] 新建 `integrated_tests/test_typescript_detection.py`

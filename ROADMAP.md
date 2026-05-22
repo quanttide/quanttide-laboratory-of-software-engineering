@@ -2,11 +2,8 @@
 
 ## 假设
 
-1. `apps/qtcloud-code/` (qtcloud-code-cli) 是生产 CLI 工具，用户实际运行它。
-2. `examples/default/` 是研究原型，探索"知识驱动的自主重构智能体"——设计有野心，但实现只有 Python 且不完整。
-3. 两边的共同知识基座是 `examples/code_refactor.py`（6 类认知模型 + 实例数据），但它嵌在 git 子模块内，无法被 `apps/` 直接引用。
-4. 最终目标是将智能体能力反哺到生产 CLI，使 `qtcloud-code audit` 不仅能报告问题，还能自动修复。
-5. 主力开发语言是 Python，需要读各种代码（TS/JS 等）。因此多语言**检测**有价值，多语言**变换**不需要。
+1. `examples/default/` 是研究原型，探索"知识驱动的自主重构智能体"——设计有野心，但实现只有 Python 且不完整。
+2. 主力开发语言是 Python，需要读各种代码（TS/JS 等）。因此多语言**检测**有价值，多语言**变换**不需要。
 
 ---
 
@@ -20,19 +17,15 @@
 
 | 优先级 | 项目 | 原因 |
 |--------|------|------|
-| P0 | 统一数据模型 | `AuditResult` 与 `SmellInstance` 能互转，审计→修复链路打通 |
 | P0 | 明确语言策略 | 决定 multi-language 的技术路线（tree-sitter vs CLI wrapper），这会阻塞后续所有阶段 |
 | P1 | Transformers 扩展（Python） | **主力写 Python，自动修复直接提升效率。Python 有 `ast.NodeTransformer` + `unparse` 的语言红利，应优先收割** |
-| P1 | 真实验证机制 | `_check_condition` 已通过 LLM 判定替代恒 True；`verify()` 已追加 LLM 语义验证 |
 | P2 | 多语言检测（只读） | 需要读各种代码，CLI wrapper 检测报告辅助理解 |
-| P2 | CLI 集成 | `qtcloud-code fix` 命令：audit + 推荐 + 用户确认 + 自动修复 |
 
 ### 不做什么
 
 | 放弃 | 原因 |
 |------|------|
 | 6 元认知模型的运行时推理 | 当前的 planner 只用了 Correspondence，其他 4 个模型只是文档。不应强行在代码中体现全部认知模型 |
-| 合并到 `apps/` | `examples/default` 是最终归宿，不做跨仓库合并 |
 | 回滚机制的持久化改进 | 内存备份对 demo 够用，不用过度工程 |
 | tree-sitter AST 全量解析 | 成本被严重低估（检测器全部重写 + transformers 适配 + C 扩展 CI），改用 CLI wrapper 策略 |
 | TS 变换（extract-class / move-function 等） | 主力写 Python，TS 只读不改。TS 变换无可靠工程方案（`unparse` 等价物缺失），不值得投入 |
@@ -54,24 +47,13 @@
 
 ## 阶段路线图
 
-### Phase 0 — 清理不一致（在 `examples/default` 内完成）
+### Phase 0 — 清理不一致
 
 目标：让现有代码说同一套话。
 
 - 统一检测阈值（>30 行 vs >50 行，选择 >30）
 - 统一检测入口：`integrated_tests` 不再自建正则，改为调用公共 detector
-- 删除 `examples/default/examples/code_refactor.py`（已稳定无用），数据内联到 `knowledge.py` 或归档
-
-> 开发策略：全部在 `examples/default` 内完成，`apps/` 不纳入路线图。
-
-### Phase 1 — 数据模型统一
-
-目标：审计→修复链路首次打通。
-
-- 定义共享的 `SmellReport` 数据类，合并 `AuditResult` + `SmellInstance` 的能力
-- `audit.py` 输出 `SmellReport` 而非专有 `AuditResult`
-- `planner.py` 消费 `SmellReport` 生成 `PlanStep`
-- 将 `examples/default/src/models.py` 提升到共享包
+- 删除 `examples/code_refactor.py`（已稳定无用），数据内联到 `knowledge.py` 或归档
 
 ### Phase 2 — Transformers 扩展（Python）
 
@@ -84,16 +66,9 @@
 
 ### Phase 3 — 真实验证
 
-目标：自动修复不再盲目执行。
+目标：处理验证失败的归因问题。
 
-验证分级（避免给用户虚假的"验证通过"信号）：
-- **L1（已完成）**：编译/类型检查 —— `py_compile`（Python）；`_check_condition` 通过 LLM 判定重构前置条件
-- **L2（未来）**：运行项目测试 —— 可选，需要用户显式启用
-
-- [x] `_check_condition` 改用 LLM 判定（`llm_client.check_condition`），弃用恒 True
-- [x] `verify()` 追加 LLM 语义一致性验证，降级策略确保无 API Key 时行为不变
-- [ ] 处理"验证失败是因为项目本身有问题还是重构引入的"——重构前运行 baseline 检查，重构后对比增量
-- `condition` 字段保留在 code_refactor.py 中作为知识文档，但不参与执行逻辑
+- 处理"验证失败是因为项目本身有问题还是重构引入的"——重构前运行 baseline 检查，重构后对比增量
 
 ### Phase 4 — 多语言检测（只读）
 
@@ -108,8 +83,6 @@
 - 实现 `PythonDetector`：保持当前 `ast` 实现不变
 - `scan_project` 按文件扩展名路由到对应 Detector
 - 删除 `integrated_tests/_find_functions_ts` 手写正则，改为调用 `TypeScriptDetector`
-
-~~Phase 5 — CLI 集成~~（已删除）
 
 ---
 
