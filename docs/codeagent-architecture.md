@@ -72,9 +72,10 @@ Review（验证——重新检测）
 ## 核心设计原则
 
 1. **Review 是安全网** — 无论 LLM 是否参与，review 层必须能独立运行
-2. **Reflect 工具是证据链** — backward_slice 等不依赖 LLM，但 LLM 消费它们的输出
-3. **Refactor 需要人类审核** — `--dry-run` 默认，`--apply` 确认
-4. **Review 闭环** — 任何修改后都要重新 review 验证
+2. **Reflect 必须绑定 Finding/Evidence** — 没有精确行号、变量名、数据流路径的 reflect 输出是无效的。跨文件/跨模块推理会退化为空洞的架构建议
+3. **Reflect 工具是证据链** — backward_slice 等不依赖 LLM，但 LLM 消费它们的输出
+4. **Refactor 需要人类审核** — `--dry-run` 默认，`--apply` 确认
+5. **Review 闭环** — 任何修改后都要重新 review 验证
 
 ## 与 Skill 架构的关系
 
