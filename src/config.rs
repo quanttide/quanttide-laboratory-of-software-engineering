@@ -10,6 +10,22 @@ pub struct ContractConfig {
 #[derive(Debug, Deserialize, Default)]
 pub struct CodeConfig {
     pub rules: Option<Vec<String>>,
+    pub exclude: Option<Vec<String>>,
+}
+
+pub fn is_excluded(file_rel: &str, config: &Option<ContractConfig>) -> bool {
+    let Some(config) = config else { return false };
+    let Some(code) = &config.code else { return false };
+    let Some(exclude) = &code.exclude else { return false };
+    exclude.iter().any(|p| {
+        if p.ends_with('/') {
+            file_rel.starts_with(p)
+        } else if p.starts_with("**/") {
+            file_rel.ends_with(&p[3..])
+        } else {
+            file_rel == p || file_rel.ends_with(&format!("/{}", p))
+        }
+    })
 }
 
 pub fn load_contract(path: &Path) -> Option<ContractConfig> {
@@ -56,6 +72,7 @@ mod tests {
         let config = Some(ContractConfig {
             code: Some(CodeConfig {
                 rules: Some(vec!["rule-b".to_string()]),
+                exclude: None,
             }),
         });
         let all = &["rule-a", "rule-b", "rule-c"];
@@ -69,6 +86,7 @@ mod tests {
         let config = Some(ContractConfig {
             code: Some(CodeConfig {
                 rules: Some(vec!["rule-b".to_string()]),
+                exclude: None,
             }),
         });
         let all = &["rule-a", "rule-b", "rule-c"];

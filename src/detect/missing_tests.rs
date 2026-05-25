@@ -7,7 +7,7 @@ pub const DESCRIPTION: &str = "源文件缺少对应测试";
 
 const SOURCE_EXTENSIONS: &[&str] = &["rs", "py", "go", "dart", "ts", "tsx"];
 
-pub fn check_missing_tests(project_root: &Path, source_files: &[PathBuf]) -> Vec<Finding> {
+pub fn check_missing_tests(project_root: &Path, source_files: &[PathBuf], config: &Option<crate::config::ContractConfig>) -> Vec<Finding> {
     let mut findings = Vec::new();
     let mut seen = std::collections::HashSet::new();
 
@@ -28,6 +28,10 @@ pub fn check_missing_tests(project_root: &Path, source_files: &[PathBuf]) -> Vec
 
         let ext = rel.extension().and_then(|s| s.to_str()).unwrap_or("");
         if !SOURCE_EXTENSIONS.contains(&ext) {
+            continue;
+        }
+
+        if crate::config::is_excluded(&rel.to_string_lossy(), config) {
             continue;
         }
 
@@ -188,7 +192,7 @@ mod tests {
         std::fs::create_dir(&src).unwrap();
         std::fs::write(src.join("lib.rs"), "pub fn f() {}").unwrap();
         std::fs::write(src.join("main.rs"), "fn main() {}").unwrap();
-        let findings = check_missing_tests(dir.path(), &[src.join("lib.rs"), src.join("main.rs")]);
+        let findings = check_missing_tests(dir.path(), &[src.join("lib.rs"), src.join("main.rs")], &None);
         assert_eq!(findings.len(), 2);
         assert_eq!(findings[0].severity, Severity::Must);
         assert_eq!(findings[0].rule_id, "missing-tests");
@@ -200,7 +204,7 @@ mod tests {
         let src = dir.path().join("src");
         std::fs::create_dir(&src).unwrap();
         std::fs::write(src.join("lib.rs"), "#[cfg(test)]\nmod tests {}").unwrap();
-        let findings = check_missing_tests(dir.path(), &[src.join("lib.rs")]);
+        let findings = check_missing_tests(dir.path(), &[src.join("lib.rs")], &None);
         assert!(findings.is_empty());
     }
 
@@ -213,7 +217,23 @@ mod tests {
         std::fs::create_dir(&tests).unwrap();
         std::fs::write(src.join("lib.rs"), "pub fn f() {}").unwrap();
         std::fs::write(tests.join("lib.rs"), "// test").unwrap();
-        let findings = check_missing_tests(dir.path(), &[src.join("lib.rs")]);
+        let findings = check_missing_tests(dir.path(), &[src.join("lib.rs")], &None);
+        assert!(findings.is_empty());
+    }
+
+    #[test]
+    fn test_check_missing_tests_exclude_config() {
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("src");
+        std::fs::create_dir(&src).unwrap();
+        std::fs::write(src.join("lib.rs"), "pub fn f() {}").unwrap();
+        let config = Some(crate::config::ContractConfig {
+            code: Some(crate::config::CodeConfig {
+                rules: None,
+                exclude: Some(vec!["src/lib.rs".into()]),
+            }),
+        });
+        let findings = check_missing_tests(dir.path(), &[src.join("lib.rs")], &config);
         assert!(findings.is_empty());
     }
 }

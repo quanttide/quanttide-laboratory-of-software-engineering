@@ -80,7 +80,7 @@ fn run_review(path: &str, format: &str, cli_rules: Option<Vec<String>>, write_st
 
     if enabled_rules.contains(&qtcloud_code_cli::detect::missing_tests::RULE_ID.to_string()) {
         let project_root = find_project_root(&root).unwrap_or_else(|| root.clone());
-        let test_findings = qtcloud_code_cli::detect::missing_tests::check_missing_tests(&project_root, &source_files);
+        let test_findings = qtcloud_code_cli::detect::missing_tests::check_missing_tests(&project_root, &source_files, &config);
         all_findings.extend(test_findings);
     }
 
