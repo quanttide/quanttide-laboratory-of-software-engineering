@@ -2,6 +2,10 @@ use std::path::PathBuf;
 
 use super::{Detector, Finding, Severity};
 
+const MAY_THRESHOLD: usize = 3;
+const SHOULD_THRESHOLD: usize = 5;
+const MUST_THRESHOLD: usize = 8;
+
 pub struct UnsafeBlockDetector;
 
 impl Detector for UnsafeBlockDetector {
@@ -16,28 +20,25 @@ impl Detector for UnsafeBlockDetector {
     fn detect(&self, _source: &str, tree: &tree_sitter::Tree, file_path: &PathBuf) -> Vec<Finding> {
         let mut findings = Vec::new();
         let mut cursor = tree.walk();
-        let max_depth = 200;
-        let mut depth = 0;
 
         loop {
             let node = cursor.node();
             if node.kind() == "unsafe_block" {
                 let stmt_count = count_block_statements(&node);
-                if stmt_count > 5 {
+                if let Some(severity) = classify(stmt_count) {
                     let pos = node.start_position();
                     findings.push(Finding {
                         file_path: file_path.clone(),
                         line: pos.row + 1,
                         column: pos.column + 1,
-                        severity: Severity::Must,
+                        severity,
                         rule_id: self.rule_id().to_string(),
-                        message: format!("unsafe 块包含 {} 条语句，建议控制在 5 条以内", stmt_count),
+                        message: format!("unsafe 块包含 {} 条语句", stmt_count),
                     });
                 }
             }
 
-            if cursor.goto_first_child() && depth < max_depth {
-                depth += 1;
+            if cursor.goto_first_child() {
                 continue;
             }
             loop {
@@ -47,7 +48,6 @@ impl Detector for UnsafeBlockDetector {
                 if !cursor.goto_parent() {
                     return findings;
                 }
-                depth -= 1;
             }
         }
     }
@@ -69,4 +69,16 @@ fn count_block_statements(node: &tree_sitter::Node) -> usize {
         }
     }
     count
+}
+
+fn classify(stmts: usize) -> Option<Severity> {
+    if stmts > MUST_THRESHOLD {
+        Some(Severity::Must)
+    } else if stmts > SHOULD_THRESHOLD {
+        Some(Severity::Should)
+    } else if stmts > MAY_THRESHOLD {
+        Some(Severity::May)
+    } else {
+        None
+    }
 }
