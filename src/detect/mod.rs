@@ -43,6 +43,8 @@ pub fn walk_tree<F: FnMut(tree_sitter::Node)>(tree: &tree_sitter::Tree, mut f: F
 
 pub mod long_function;
 pub mod long_parameter_list;
-pub mod missing_tests;
 pub mod unsafe_block;
 pub mod unused_variable;
+pub mod missing_tests;
+pub mod dead_code;
+pub mod depgraph;

@@ -51,6 +51,7 @@ fn all_rule_ids() -> Vec<&'static str> {
     let mut ids: Vec<&str> = list_detectors().iter().map(|d| d.rule_id()).collect();
     ids.push(qtcloud_code_cli::detect::unused_variable::RULE_ID);
     ids.push(qtcloud_code_cli::detect::missing_tests::RULE_ID);
+    ids.push(qtcloud_code_cli::detect::dead_code::RULE_ID);
     ids
 }
 
@@ -98,7 +99,34 @@ fn run_review(path: &str, format: &str, cli_rules: Option<Vec<String>>, write_st
         all_findings.extend(compiler_findings);
     }
 
-    // reflect: 程序切片 + 数据流 + 依赖图分析
+    // 项目级扫描：依赖图 + 死代码
+    if enabled_rules.contains(&qtcloud_code_cli::detect::dead_code::RULE_ID.to_string()) {
+        for file_path in &source_files {
+            let ext = file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
+            if ext != "rs" { continue; }
+            let source = match std::fs::read_to_string(file_path) {
+                Ok(s) => s,
+                Err(_) => continue,
+            };
+            let mut parser = tree_sitter::Parser::new();
+            if parser.set_language(&tree_sitter_rust::LANGUAGE.into()).is_err() { continue; }
+            if let Some(tree) = parser.parse(&source, None) {
+                let dead = qtcloud_code_cli::detect::dead_code::check_dead_code(&source, &tree);
+                for func in &dead {
+                    println!("  ├─ 死代码: {}:L{} `{}` 未被调用", file_path.display(), func.line, func.name);
+                }
+            }
+        }
+        let dep = qtcloud_code_cli::detect::depgraph::build_dep_graph(&root);
+        for node in &dep.nodes {
+            let reverse = qtcloud_code_cli::detect::depgraph::reverse_dep_slice(&dep, node);
+            if !reverse.is_empty() {
+                println!("  ├─ depgraph: {} 被 {:?} 依赖", node, reverse);
+            }
+        }
+    }
+
+    // reflect: 以 finding 为起点的根因追溯
     if enable_reflect {
         for finding in &all_findings {
             let file_path = &finding.file_path;
@@ -120,34 +148,6 @@ fn run_review(path: &str, format: &str, cli_rules: Option<Vec<String>>, write_st
                             }
                         }
                     }
-                }
-            }
-        }
-        // 依赖图分析
-        let dep = qtcloud_code_cli::reflect::depgraph::build_dep_graph(&root);
-        for node in &dep.nodes {
-            let reverse = qtcloud_code_cli::reflect::depgraph::reverse_dep_slice(&dep, node);
-            if !reverse.is_empty() {
-                println!("  ├─ depgraph: {} 被 {:?} 依赖", node, reverse);
-            }
-        }
-    }
-
-    // refactor: 死代码检测
-    if enable_refactor {
-        for file_path in &source_files {
-            let ext = file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
-            if ext != "rs" { continue; }
-            let source = match std::fs::read_to_string(file_path) {
-                Ok(s) => s,
-                Err(_) => continue,
-            };
-            let mut parser = tree_sitter::Parser::new();
-            if parser.set_language(&tree_sitter_rust::LANGUAGE.into()).is_err() { continue; }
-            if let Some(tree) = parser.parse(&source, None) {
-                let dead = qtcloud_code_cli::refactor::transform::detect_dead_code(&source, &tree);
-                for func in &dead {
-                    println!("  ├─ 死代码: {}:L{} `{}` 未被调用", file_path.display(), func.line, func.name);
                 }
             }
         }
@@ -246,5 +246,6 @@ fn run_list_rules() -> Result<(), String> {
     println!("\n可用检测规则（编译器级）:");
     println!("  {} — {}", qtcloud_code_cli::detect::unused_variable::RULE_ID, qtcloud_code_cli::detect::unused_variable::DESCRIPTION);
     println!("  {} — {}", qtcloud_code_cli::detect::missing_tests::RULE_ID, qtcloud_code_cli::detect::missing_tests::DESCRIPTION);
+    println!("  {} — {}", qtcloud_code_cli::detect::dead_code::RULE_ID, qtcloud_code_cli::detect::dead_code::DESCRIPTION);
     Ok(())
 }
