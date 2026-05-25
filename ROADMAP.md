@@ -1,43 +1,51 @@
-# ROADMAP — qtcloud-code-cli
+# ROADMAP — qtcloud-code-cli（实验室）
 
 ## 定位
 
-多语言代码静态分析 CLI，聚焦**可检测、可复现、可自动化**的代码问题。不依赖 LLM，纯规则引擎 + AST 分析。
+3R 代码审查 CLI：**review → reflect → refactor**。
 
-## 阶段
+- **review**: 规则引擎扫描（确定性，无 LLM）
+- **reflect**: 程序切片 + 数据流 + 依赖图分析（确定性）→ LLM 因果解释（可选）
+- **refactor**: AST 机械变换（确定性）→ LLM 策略选择（可选）
 
-### P0 — CLI 骨架 & 单语言 MVP
+## P0 — 已实现 ✅
 
-- [ ] CLI 命令框架（`scan`/`check`/`list-rules`）
-- [ ] tree-sitter 集成，支持 Rust 解析
-- [ ] 第一个检测器：无用依赖 / 未使用变量（Rust）
-- [ ] 输出格式：JSON + 终端表格
+- [x] CLI 框架（`review` / `list-rules`）
+- [x] tree-sitter 多语言集成（Rust / Python / Go / Dart / TypeScript）
+- [x] 检测器：过长函数、unsafe 块、过长参数列表、未使用变量、缺失测试
+- [x] 输出格式：终端 / JSON / STATUS.md
+- [x] 配置系统：`.quanttide/code/contract.yaml` + `--rules`
+- [x] 自举验证 + 77 测试 + 95% 覆盖率
+- [x] 发布流水线：`cli/v*` tag → crates.io
 
-### P1 — 多语言扩展
+## P1 — 架构升级
 
-- [ ] 语言解析器抽象层（`LanguageParser` trait）
-- [ ] Python 支持（tree-sitter-python）
-- [ ] Go 支持（tree-sitter-go）
-- [ ] Dart 支持（tree-sitter-dart）
-- [ ] TypeScript/JavaScript 支持（tree-sitter-typescript）
-- [ ] 通用检测器：过长函数、过长参数列表、重复代码
+### review 增强
+- [ ] 文件级忽略（行注释 / 配置 exclude）
+- [ ] `--reflect` 标志（机械侦探：切片 + 数据流 + 依赖图）
+- [ ] `--llm` 标志（LLM 二次审查 + 因果解释）
+- [ ] 增量扫描（git diff 范围）
 
-### P2 — 规则系统
+### contract 命令
+- [ ] `contract init` — 交互式创建配置
+- [ ] `contract list` — 替换 list-rules（JSON 输出）
+- [ ] `contract validate` — 校验配置 vs 已知规则
 
-- [ ] 规则注册与配置（`--rules` / `.qtcloud-code.toml`）
-- [ ] 规则分类：正确性 / 性能 / 可维护性 / 风格
-- [ ] 忽略机制（行级注释 / 文件级配置）
-- [ ] 自定义规则 DSL 或插件接口
+## P2 — LLM 集成
 
-### P3 — 生产就绪
+- [ ] LLM 二次审查：排序、去重、语义规则
+- [ ] LLM 因果解释：在证据链上做根因分析
+- [ ] 纯 LLM 规则：安全漏洞、并发 bug、逻辑错误
+- [ ] `--mode lint / llm / deep` 三种模式
 
-- [ ] CI 集成（GitHub Action、pre-commit hook）
-- [ ] 增量扫描（只分析 diff）
-- [ ] 基线模式（仅报告新增问题）
-- [ ] 多线程并行扫描
+## P3 — refactor
+
+- [ ] 机械变换引擎：函数提取、重命名、内联、死代码删除
+- [ ] dry-run / apply / 自动验证 / 回滚
+- [ ] LLM 策略选择：复杂场景的代码生成
 
 ## 非目标
 
-- 不做自动修复（只检测，不修改）
-- 不做语义级分析（类型推断、数据流分析）
-- 不依赖 LLM 或外部 API
+- 不做纯 LLM 的代码审查（规则引擎是安全网，必须优先运行）
+- 不做自动修复（--apply 需要人类确认，默认 dry-run）
+- 不承诺可复现性在 LLM 介入后完全不变（证据链部分确定，解释部分不确定）
