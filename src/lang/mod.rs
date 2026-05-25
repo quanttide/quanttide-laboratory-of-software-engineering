@@ -1,6 +1,10 @@
 use std::path::Path;
 
+pub mod dart;
+pub mod go;
 pub mod rust;
+pub mod python;
+pub mod typescript;
 
 #[derive(Debug, Clone)]
 pub struct ParseResult {

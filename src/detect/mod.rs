@@ -24,4 +24,6 @@ pub trait Detector {
 }
 
 pub mod long_function;
+pub mod long_parameter_list;
 pub mod unsafe_block;
+pub mod unused_variable;

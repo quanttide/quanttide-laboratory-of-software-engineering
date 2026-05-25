@@ -6,11 +6,13 @@ const MAY_THRESHOLD: usize = 30;
 const SHOULD_THRESHOLD: usize = 50;
 const MUST_THRESHOLD: usize = 80;
 
+const FUNCTION_NODE_KINDS: &[&str] = &["function_item", "function_definition", "function_declaration", "method_declaration"];
+
 pub struct LongFunctionDetector;
 
 impl Detector for LongFunctionDetector {
     fn rule_id(&self) -> &'static str {
-        "rust-long-function"
+        "long-function"
     }
 
     fn description(&self) -> &'static str {
@@ -23,7 +25,7 @@ impl Detector for LongFunctionDetector {
 
         loop {
             let node = cursor.node();
-            if node.kind() == "function_item" {
+            if FUNCTION_NODE_KINDS.contains(&node.kind()) {
                 let start = node.start_position().row;
                 let end = node.end_position().row;
                 let body_lines = end - start;
@@ -69,14 +71,15 @@ fn classify(lines: usize) -> Option<Severity> {
 }
 
 fn extract_function_name(node: &tree_sitter::Node, source: &str) -> String {
+    if let Some(name) = find_identifier_in_children(node, source) {
+        return name;
+    }
     let mut cursor = node.walk();
     if cursor.goto_first_child() {
         loop {
             let child = cursor.node();
-            if child.kind() == "identifier" {
-                if let Ok(s) = child.utf8_text(source.as_bytes()) {
-                    return s.to_string();
-                }
+            if let Some(name) = find_identifier_in_children(&child, source) {
+                return name;
             }
             if !cursor.goto_next_sibling() {
                 break;
@@ -84,4 +87,22 @@ fn extract_function_name(node: &tree_sitter::Node, source: &str) -> String {
         }
     }
     "<anonymous>".to_string()
+}
+
+fn find_identifier_in_children(node: &tree_sitter::Node, source: &str) -> Option<String> {
+    let mut cursor = node.walk();
+    if cursor.goto_first_child() {
+        loop {
+            let child = cursor.node();
+            if child.kind() == "identifier" {
+                if let Ok(s) = child.utf8_text(source.as_bytes()) {
+                    return Some(s.to_string());
+                }
+            }
+            if !cursor.goto_next_sibling() {
+                break;
+            }
+        }
+    }
+    None
 }

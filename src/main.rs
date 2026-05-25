@@ -22,6 +22,9 @@ enum Commands {
         path: String,
         #[arg(long, default_value = "terminal")]
         format: String,
+        /// 仅运行指定的检测规则（逗号分隔）
+        #[arg(long, value_delimiter = ',')]
+        rules: Option<Vec<String>>,
         /// 将扫描结果写入被检测项目的 STATUS.md
         #[arg(long)]
         status: bool,
@@ -34,13 +37,20 @@ fn list_detectors() -> Vec<Box<dyn Detector>> {
     vec![
         Box::new(qtcloud_code_cli::detect::unsafe_block::UnsafeBlockDetector),
         Box::new(qtcloud_code_cli::detect::long_function::LongFunctionDetector),
+        Box::new(qtcloud_code_cli::detect::long_parameter_list::LongParameterListDetector),
     ]
+}
+
+fn all_rule_ids() -> Vec<&'static str> {
+    let mut ids: Vec<&str> = list_detectors().iter().map(|d| d.rule_id()).collect();
+    ids.push(qtcloud_code_cli::detect::unused_variable::RULE_ID);
+    ids
 }
 
 fn main() {
     let cli = Cli::parse();
     let result = match cli.command {
-        Commands::Review { path, format, status } => run_review(&path, &format, status),
+        Commands::Review { path, format, rules, status } => run_review(&path, &format, rules, status),
         Commands::ListRules => run_list_rules(),
     };
 
@@ -50,30 +60,43 @@ fn main() {
     }
 }
 
-fn run_review(path: &str, format: &str, write_status: bool) -> Result<(), String> {
-    let root = Path::new(path);
-    if !root.exists() {
+fn run_review(path: &str, format: &str, cli_rules: Option<Vec<String>>, write_status: bool) -> Result<(), String> {
+    let raw_path = Path::new(path);
+    if !raw_path.exists() {
         return Err(format!("路径不存在: {}", path));
     }
+    let root = raw_path
+        .canonicalize()
+        .map_err(|e| format!("无法规范化路径: {}", e))?;
 
-    let mut parser = qtcloud_code_cli::lang::rust::RustParser::new()?;
-    let detectors = list_detectors();
+    let config = qtcloud_code_cli::config::load_contract(&root);
+    let enabled_rules = qtcloud_code_cli::config::resolve_enabled_rules(&cli_rules, &config, &all_rule_ids());
+    let all_detectors = list_detectors();
+    let detectors: Vec<Box<dyn Detector>> = all_detectors.into_iter().filter(|d| enabled_rules.contains(&d.rule_id().to_string())).collect();
+
+    let mut parsers: Vec<Box<dyn LanguageParser>> = vec![
+        Box::new(qtcloud_code_cli::lang::rust::RustParser::new()?),
+        Box::new(qtcloud_code_cli::lang::python::PythonParser::new()?),
+        Box::new(qtcloud_code_cli::lang::go::GoParser::new()?),
+        Box::new(qtcloud_code_cli::lang::dart::DartParser::new()?),
+        Box::new(qtcloud_code_cli::lang::typescript::TypeScriptParser::new()?),
+        Box::new(qtcloud_code_cli::lang::typescript::TsxParser::new()?),
+    ];
     let mut all_findings: Vec<Finding> = Vec::new();
 
-    let entries = walkdir::WalkDir::new(root)
+    let entries = walkdir::WalkDir::new(&root)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file());
 
-    let extensions = parser.file_extensions();
     for entry in entries {
         let file_path = entry.path();
-        if !extensions
-            .iter()
-            .any(|ext| file_path.extension().map_or(false, |e| e == *ext))
-        {
+        let Some(ext) = file_path.extension().and_then(|e| e.to_str()) else {
             continue;
-        }
+        };
+        let Some(parser) = parsers.iter_mut().find(|p| p.file_extensions().contains(&ext)) else {
+            continue;
+        };
 
         let source = match std::fs::read_to_string(file_path) {
             Ok(s) => s,
@@ -94,6 +117,12 @@ fn run_review(path: &str, format: &str, write_status: bool) -> Result<(), String
         }
     }
 
+    if let Some(project_root) = find_project_root(&root) {
+        let compiler_findings =
+            qtcloud_code_cli::detect::unused_variable::check_compiler(&project_root, &enabled_rules)?;
+        all_findings.extend(compiler_findings);
+    }
+
     match format {
         "json" => {
             let stdout = io::stdout();
@@ -108,7 +137,7 @@ fn run_review(path: &str, format: &str, write_status: bool) -> Result<(), String
     }
 
     if write_status {
-        let status_path = find_project_root(root).map(|p| p.join("STATUS.md"));
+        let status_path = find_project_root(&root).map(|p| p.join("STATUS.md"));
         if let Some(status_path) = status_path {
             let file = std::fs::File::create(&status_path)
                 .map_err(|e| format!("无法创建 STATUS.md: {}", e))?;
@@ -135,9 +164,11 @@ fn find_project_root(path: &Path) -> Option<PathBuf> {
 }
 
 fn run_list_rules() -> Result<(), String> {
-    println!("可用检测规则:");
+    println!("可用检测规则（语法级）:");
     for d in list_detectors() {
         println!("  {} — {}", d.rule_id(), d.description());
     }
+    println!("\n可用检测规则（编译器级）:");
+    println!("  {} — {}", qtcloud_code_cli::detect::unused_variable::RULE_ID, qtcloud_code_cli::detect::unused_variable::DESCRIPTION);
     Ok(())
 }

@@ -13,23 +13,17 @@
 
 ## 高优
 
-- [ ] 检测器：未使用变量（需要语义分析 / 走 rustc 路径）
-- [ ] file_path 输出改为绝对路径或相对 CWD
-- [ ] 多语言：`LanguageParser` trait 提取后，加 Python 支持
+- [x] 检测器：未使用变量（走 rustc 路径，运行 `cargo check --message-format=json` 解析）
+- [x] file_path 输出改为绝对路径（入口处 canonicalize）
+- [x] 多语言：`LanguageParser` trait 提取后，加 Python 支持
 
 ## 中优
 
-- [ ] tree-sitter-go 绑定
-- [ ] tree-sitter-dart 绑定
-- [ ] tree-sitter-typescript 绑定
-- [ ] 通用检测器：过长参数列表
-- [ ] `--rules` 选择启用的检测器
-- [ ] `.qtcloud-code.toml` 配置文件
+- [x] tree-sitter-go 绑定（含 `function_declaration` / `method_declaration` 节点支持）
+- [x] tree-sitter-dart 绑定（`function_signature` 嵌套结构处理）
+- [x] tree-sitter-typescript 绑定（含 `.ts` / `.tsx` 双解析器）
+- [x] 通用检测器：过长函数（跨语言，同时支持 Rust `function_item` 和 Python `function_definition`）
+- [x] 通用检测器：过长参数列表（跨语言，使用 `child_by_field_name("parameters")`）
+- [x] `--rules` 选择启用的检测器（`--rules long-function,long-parameter-list`）
+- [x] `.quanttide/code/contract.yaml` 配置文件（从扫描目录向上查找，支持 `code.rules` 字段）
 
-## 低优
-
-- [ ] CI 集成 GitHub Action
-- [ ] pre-commit hook 支持
-- [ ] 增量扫描（git diff 范围）
-- [ ] 基线模式（`--baseline baseline.json`）
-- [ ] 多线程并行扫描
