@@ -126,3 +126,51 @@ pub async fn enhance_finding(code: &str, finding: &str, api_key: &str) -> Result
         confidence: parsed["confidence"].as_str().unwrap_or("confirm").to_string(),
     })
 }
+
+/// 计算 reflect 输出的置信度（确定性计算，非 LLM 自评）
+/// 基于证据锚定率：行号引用数 + 变量名引用数
+pub fn compute_confidence(text: &str) -> &'static str {
+    let line_refs = count_pattern(text, &["L", "行", "line"]);
+    let var_refs = count_pattern(text, &["parts", "price", "qty", "trim", "parse",
+        "total", "sum", "v", "name", "threshold", "items", "item"]);
+    let total = line_refs + var_refs;
+
+    if total >= 3 { "high" }
+    else if total >= 1 { "medium" }
+    else { "low" }
+}
+
+fn count_pattern(text: &str, patterns: &[&str]) -> usize {
+    let mut count = 0;
+    for p in patterns {
+        let mut start = 0;
+        while let Some(pos) = text[start..].find(p) {
+            count += 1;
+            start += pos + p.len();
+        }
+    }
+    count
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_compute_confidence_high() {
+        let t = "L3 的 price 解析和 L7 的 qty 解析用了相同模式";
+        assert_eq!(compute_confidence(t), "high");
+    }
+
+    #[test]
+    fn test_compute_confidence_medium() {
+        let t = "L8 的数组访问未检查长度";
+        assert_eq!(compute_confidence(t), "medium");
+    }
+
+    #[test]
+    fn test_compute_confidence_low() {
+        let t = "职责不够单一，建议架构分层";
+        assert_eq!(compute_confidence(t), "low");
+    }
+}
