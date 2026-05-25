@@ -1,8 +1,20 @@
 # Skill 架构（设计记录）
 
+## 区别：Skill 不是系统提示词
+
+| | 系统提示词 | Skill |
+|--|-----------|-------|
+| 加载时机 | 会话启动时 | 调用时 |
+| 上下文窗口 | 始终占用 | 不占用，直到被调用 |
+| 可见性 | LLM 始终可见 | 通过 catalog 可见，但 inactive |
+| 触发方式 | 自动 | 按需（LLM 或用户） |
+| 内容 | 固定指令集 | 动态注入的工具结果 |
+
+Skill 是**按需加载到用户提示层的工具结果**，不是预加载到系统提示层的指令。
+
 ## 定义
 
-Skill = prompt + 元数据 + 工具调用指令，注册为 `.agents/skills/<name>/SKILL.md`。
+Skill = prompt + 工具调用指令 + 元数据，注册为 `.agents/skills/<name>/SKILL.md`。
 
 每个已验证的工具组合模式对应一个 Skill。
 
@@ -11,7 +23,7 @@ Skill = prompt + 元数据 + 工具调用指令，注册为 `.agents/skills/<nam
 ```
 .agents/skills/<skill-name>/SKILL.md
   ├── frontmatter: name / description / disable-model-invocation
-  └── body: prompt + 工具调用指令
+  └── body: 工具调用指令 + prompt
 ```
 
 全局级：`~/.agents/skills/`
@@ -22,17 +34,20 @@ Skill = prompt + 元数据 + 工具调用指令，注册为 `.agents/skills/<nam
 ```
 加载（项目打开时）
   → 解析 frontmatter（name + description）
-  → 存入 skill 列表
-  → 选入 catalog（受上下文窗口限制）
+  → 注册到 skill 列表
+  → 选入 catalog（摘要信息给 LLM）
+  → 不加载 body，不占上下文
 
 调用（LLM 请求时）
-  → 按 name 查找 skill
+  → LLM 从 catalog 中选中 skill
+  → skill_tool { name: "analyse-security" }
+  → 按 name 查找
   → 读取 body
-  → 运行工具 → 注入结果
-  → 返回给 LLM
+  → 运行工具（backward_slice + dataflow）
+  → 注入工具结果到 body
+  → 返回给 LLM（作为工具调用结果）
+  → 进入用户提示层
 ```
-
-body 延迟读取，不占系统 prompt。每次调用实时解析。
 
 ## 候选 Skill
 
@@ -46,7 +61,7 @@ body 延迟读取，不占系统 prompt。每次调用实时解析。
 
 ## 参考实现
 
-Zed Agent Skills 的接入方式：
+Zed Agent Skills：
 
 ```
 加载:  load_skills_from_directory()
