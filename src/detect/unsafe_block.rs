@@ -29,7 +29,7 @@ impl Detector for UnsafeBlockDetector {
                         file_path: file_path.clone(),
                         line: pos.row + 1,
                         column: pos.column + 1,
-                        severity: Severity::Warning,
+                        severity: Severity::Must,
                         rule_id: self.rule_id().to_string(),
                         message: format!("unsafe 块包含 {} 条语句，建议控制在 5 条以内", stmt_count),
                     });

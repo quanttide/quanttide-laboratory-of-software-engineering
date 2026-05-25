@@ -12,9 +12,9 @@ pub struct Finding {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Severity {
-    Error,
-    Warning,
-    Info,
+    Must,
+    Should,
+    May,
 }
 
 pub trait Detector {

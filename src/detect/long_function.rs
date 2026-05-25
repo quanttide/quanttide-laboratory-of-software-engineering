@@ -16,7 +16,7 @@ impl Detector for LongFunctionDetector {
     fn detect(&self, source: &str, tree: &tree_sitter::Tree, file_path: &PathBuf) -> Vec<Finding> {
         let mut findings = Vec::new();
         let mut cursor = tree.walk();
-        let max_lines = 30;
+        let max_lines = 60;
 
         loop {
             let node = cursor.node();
@@ -31,12 +31,12 @@ impl Detector for LongFunctionDetector {
                         file_path: file_path.clone(),
                         line: start + 1,
                         column: 1,
-                        severity: Severity::Warning,
+                        severity: Severity::Should,
                         rule_id: self.rule_id().to_string(),
-                        message: format!(
-                            "函数 `{}` 共 {} 行，建议不超过 {} 行",
-                            name, body_lines, max_lines
-                        ),
+                    message: format!(
+                        "函数 `{}` 共 {} 行，建议不超过 60 行",
+                        name, body_lines,
+                    ),
                     });
                 }
             }
