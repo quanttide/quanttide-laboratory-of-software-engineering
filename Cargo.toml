@@ -15,6 +15,10 @@ path = "src/main.rs"
 name = "slice-exp"
 path = "src/bin/slice_exp.rs"
 
+[[bin]]
+name = "dep-exp"
+path = "src/bin/dep_exp.rs"
+
 [[test]]
 name = "review"
 path = "tests/review.rs"
