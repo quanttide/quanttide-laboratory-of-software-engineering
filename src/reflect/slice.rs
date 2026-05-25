@@ -52,8 +52,38 @@ mod tests {
         parser.set_language(&tree_sitter_rust::LANGUAGE.into()).unwrap();
         if let Some(tree) = parser.parse(code, None) {
             let result = backward_slice(code, &tree, Path::new("f.rs"), 1);
-            // L1 has 3 statements, should find at least the statement at L1
             assert!(!result.is_empty(), "should find at least the target line");
+        }
+    }
+
+    #[test]
+    fn test_backward_slice_traces_variable() {
+        // y 依赖 x，切片应从 y 追溯到 x
+        let code = "fn f() {\nlet x = 1;\nlet y = x + 1;\ny\n}";
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&tree_sitter_rust::LANGUAGE.into()).unwrap();
+        if let Some(tree) = parser.parse(code, None) {
+            // L3: let y = x + 1;
+            let result = backward_slice(code, &tree, Path::new("f.rs"), 3);
+            assert!(result.iter().any(|s| s.text.contains("let x")),
+                "should trace from y back to x definition");
+            assert!(result.iter().any(|s| s.text.contains("let y")),
+                "should include the target statement");
+        }
+    }
+
+    #[test]
+    fn test_backward_slice_multiline_function() {
+        let code = "fn f(items: &[i32]) -> i32 {\nlet mut sum = 0;\nfor item in items {\nlet v = *item;\nsum += v;\n}\nsum\n}";
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&tree_sitter_rust::LANGUAGE.into()).unwrap();
+        if let Some(tree) = parser.parse(code, None) {
+            // L5: sum += v;
+            let result = backward_slice(code, &tree, Path::new("f.rs"), 5);
+            assert!(result.iter().any(|s| s.text.contains("let mut sum")),
+                "should trace sum to its definition");
+            assert!(result.iter().any(|s| s.text.contains("let v")),
+                "should trace v to its definition");
         }
     }
 }

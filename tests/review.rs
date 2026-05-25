@@ -157,3 +157,41 @@ fn test_review_unknown_format_defaults_to_terminal() {
         .unwrap();
     assert!(output.status.success());
 }
+
+#[test]
+fn test_review_reflect_flag() {
+    let fixture = fixture_path();
+    let output = cli()
+        .arg("review")
+        .arg(&fixture)
+        .arg("--reflect")
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_review_dead_code_rule() {
+    let fixture = fixture_path();
+    let output = cli()
+        .arg("review")
+        .arg(&fixture)
+        .arg("--rules")
+        .arg("dead-code")
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_review_dep_graph_rule() {
+    let fixture = fixture_path();
+    let output = cli()
+        .arg("review")
+        .arg(&fixture)
+        .arg("--rules")
+        .arg("dep-graph")
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+}

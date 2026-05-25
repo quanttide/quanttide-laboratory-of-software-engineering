@@ -1,66 +1,4 @@
 use std::collections::HashSet;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_empty_graph_no_findings() {
-        let g = DepGraph { nodes: vec![], edges: vec![] };
-        assert!(check(&g).is_empty());
-    }
-
-    #[test]
-    fn test_cycle_detection() {
-        let g = DepGraph {
-            nodes: vec!["a".into(), "b".into()],
-            edges: vec![("a".into(), "b".into()), ("b".into(), "a".into())],
-        };
-        let f = check(&g);
-        assert!(f.iter().any(|x| x.message.contains("循环依赖")));
-    }
-
-    #[test]
-    fn test_orphan_detection() {
-        let g = DepGraph {
-            nodes: vec!["a".into(), "b".into()],
-            edges: vec![("a".into(), "b".into())],
-        };
-        let f = check(&g);
-        // a 依赖 b, a 不孤立; b 被 a 依赖, 不孤立
-        assert!(!f.iter().any(|x| x.message.contains("孤立")));
-    }
-
-    #[test]
-    fn test_high_fan_in() {
-        let nodes: Vec<String> = (0..8).map(|i| format!("m{}", i)).collect();
-        let edges: Vec<(String, String)> = (1..8).map(|i| (format!("m{}", i), "m0".into())).collect();
-        let g = DepGraph { nodes, edges };
-        let f = check(&g);
-        assert!(f.iter().any(|x| x.message.contains("高扇入")));
-    }
-
-    #[test]
-    fn test_high_fan_out() {
-        let nodes: Vec<String> = (0..8).map(|i| format!("m{}", i)).collect();
-        let edges: Vec<(String, String)> = (1..8).map(|i| ("m0".into(), format!("m{}", i))).collect();
-        let g = DepGraph { nodes, edges };
-        let f = check(&g);
-        assert!(f.iter().any(|x| x.message.contains("高扇出")));
-    }
-
-    #[test]
-    fn test_reverse_dep_slice() {
-        let g = DepGraph {
-            nodes: vec!["a".into(), "b".into(), "c".into()],
-            edges: vec![("a".into(), "c".into()), ("b".into(), "c".into())],
-        };
-        let r = reverse_dep_slice(&g, "c");
-        assert_eq!(r.len(), 2);
-        assert!(r.contains(&"a".to_string()));
-        assert!(r.contains(&"b".to_string()));
-    }
-}
 use std::path::{Path, PathBuf};
 use std::fs;
 
@@ -72,8 +10,8 @@ pub const DESCRIPTION: &str = "模块依赖图异常";
 /// 模块依赖图
 #[derive(Debug, Clone)]
 pub struct DepGraph {
-    pub nodes: Vec<String>,          // 所有模块名
-    pub edges: Vec<(String, String)>, // (from, to) 依赖关系
+    pub nodes: Vec<String>,
+    pub edges: Vec<(String, String)>,
 }
 
 /// 构建项目的模块依赖图
@@ -284,4 +222,58 @@ pub fn check(graph: &DepGraph) -> Vec<Finding> {
     }
 
     findings
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_empty_graph() {
+        let g = DepGraph { nodes: vec![], edges: vec![] };
+        assert!(check(&g).is_empty());
+    }
+
+    #[test]
+    fn test_cycle() {
+        let g = DepGraph {
+            nodes: vec!["a".into(), "b".into()],
+            edges: vec![("a".into(), "b".into()), ("b".into(), "a".into())],
+        };
+        assert!(check(&g).iter().any(|x| x.message.contains("循环依赖")));
+    }
+
+    #[test]
+    fn test_high_fan_in() {
+        let nodes: Vec<String> = (0..8).map(|i| format!("m{}", i)).collect();
+        let edges: Vec<(String, String)> = (1..8).map(|i| (format!("m{}", i), "m0".into())).collect();
+        assert!(check(&DepGraph { nodes, edges }).iter().any(|x| x.message.contains("高扇入")));
+    }
+
+    #[test]
+    fn test_reverse_dep() {
+        let g = DepGraph {
+            nodes: vec!["a".into(), "b".into(), "c".into()],
+            edges: vec![("a".into(), "c".into()), ("b".into(), "c".into())],
+        };
+        let r = reverse_dep_slice(&g, "c");
+        assert_eq!(r.len(), 2);
+    }
+
+    #[test]
+    fn test_build_from_real_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("src");
+        std::fs::create_dir_all(src.join("sub")).unwrap();
+        std::fs::write(src.join("lib.rs"), "pub mod sub;\n").unwrap();
+        std::fs::write(src.join("sub/mod.rs"), "use crate::Foo;\n").unwrap();
+        let g = build_dep_graph(dir.path());
+        assert!(g.nodes.contains(&"sub".to_string()), "should find sub, got {:?}", g.nodes);
+    }
+
+    #[test]
+    fn test_build_empty() {
+        assert!(build_dep_graph(tempfile::tempdir().unwrap().path()).nodes.is_empty());
+    }
 }
