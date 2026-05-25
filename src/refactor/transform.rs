@@ -1,15 +1,23 @@
 
 
+fn walk_all<F: FnMut(tree_sitter::Node)>(node: &tree_sitter::Node, f: &mut F) {
+    f(*node);
+    let mut cursor = node.walk();
+    if cursor.goto_first_child() {
+        loop {
+            walk_all(&cursor.node(), f);
+            if !cursor.goto_next_sibling() { break; }
+        }
+    }
+}
+
 /// 检测死代码：找出未被调用的函数
 pub fn detect_dead_code(source: &str, tree: &tree_sitter::Tree) -> Vec<DeadFunc> {
     let root = tree.root_node();
 
     // 收集所有函数定义
     let mut funcs: Vec<(String, usize, bool)> = Vec::new();
-
-    let mut cursor = root.walk();
-    loop {
-        let n = cursor.node();
+    walk_all(&root, &mut |n| {
         if n.is_named() && n.kind() == "function_item" {
             if let Some(name) = n.child_by_field_name("name")
                 .and_then(|nn| nn.utf8_text(source.as_bytes()).ok())
@@ -17,14 +25,10 @@ pub fn detect_dead_code(source: &str, tree: &tree_sitter::Tree) -> Vec<DeadFunc>
                 funcs.push((name.to_string(), n.start_position().row + 1, false));
             }
         }
-        if cursor.goto_first_child() { continue; }
-        loop { if cursor.goto_next_sibling() { break; } if !cursor.goto_parent() { break; } }
-    }
+    });
 
     // 第二遍标记调用
-    let mut cursor2 = root.walk();
-    loop {
-        let n = cursor2.node();
+    walk_all(&root, &mut |n| {
         if n.is_named() && n.kind() == "call_expression" {
             if let Some(name) = n.child_by_field_name("function")
                 .or_else(|| {
@@ -47,9 +51,7 @@ pub fn detect_dead_code(source: &str, tree: &tree_sitter::Tree) -> Vec<DeadFunc>
                 }
             }
         }
-        if cursor2.goto_first_child() { continue; }
-        loop { if cursor2.goto_next_sibling() { break; } if !cursor2.goto_parent() { break; } }
-    }
+    });
 
     funcs.into_iter()
         .filter(|(name, _, called)| !called && name != "main")

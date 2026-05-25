@@ -2,6 +2,17 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use crate::reflect::SliceEntry;
 
+fn walk_all<F: FnMut(tree_sitter::Node)>(node: &tree_sitter::Node, f: &mut F) {
+    f(*node);
+    let mut cursor = node.walk();
+    if cursor.goto_first_child() {
+        loop {
+            walk_all(&cursor.node(), f);
+            if !cursor.goto_next_sibling() { break; }
+        }
+    }
+}
+
 /// 构建反向程序切片：给定代码位置，找出所有影响该点的语句
 pub fn backward_slice(
     source: &str,
@@ -68,9 +79,10 @@ pub fn cross_function_slice(
     while let Some((func_name, line)) = stack.pop() {
         let key = format!("{}:{}", func_name, line);
         if !visited.insert(key) { continue; }
-        let Some(func_node) = funcs.get(&func_name) else { continue };
-        let stmts = flatten_stmts(func_node);
-        let decls = build_decls(func_node, source);
+        let func_node = funcs.iter().find(|(n, _, _)| *n == func_name).map(|(_, _, n)| *n);
+        let Some(func_node) = func_node else { continue; };
+        let stmts = flatten_stmts(&func_node);
+        let decls = build_decls(&func_node, source);
 
         let mut local = Vec::new();
         let mut local_visited = HashSet::new();
@@ -94,7 +106,7 @@ pub fn cross_function_slice(
 
             // 检测函数调用
             if let Some(callee) = find_callee_in_stmt(stmt, source) {
-                if let Some(ret_line) = find_return_line(func_node, &callee, source, tree) {
+                if let Some(ret_line) = find_return_line(&func_node, &callee, source, tree) {
                     stack.push((callee, ret_line));
                 }
             }
@@ -110,17 +122,22 @@ pub fn cross_function_slice(
 // ===== 内部工具 =====
 
 fn find_containing_function<'t>(root: &tree_sitter::Node<'t>, line: usize) -> Option<tree_sitter::Node<'t>> {
-    let mut cursor = root.walk();
-    loop {
-        let n = cursor.node();
-        if n.is_named() && n.kind() == "function_item" {
-            let start = n.start_position().row + 1;
-            let end = n.end_position().row + 1;
-            if start <= line && line <= end { return Some(n); }
+    fn search<'t>(node: &tree_sitter::Node<'t>, line: usize) -> Option<tree_sitter::Node<'t>> {
+        if node.is_named() && node.kind() == "function_item" {
+            let start = node.start_position().row + 1;
+            let end = node.end_position().row + 1;
+            if start <= line && line <= end { return Some(*node); }
         }
-        if cursor.goto_first_child() { continue; }
-        loop { if cursor.goto_next_sibling() { break; } if !cursor.goto_parent() { break; } }
+        let mut cursor = node.walk();
+        if cursor.goto_first_child() {
+            loop {
+                if let Some(found) = search(&cursor.node(), line) { return Some(found); }
+                if !cursor.goto_next_sibling() { break; }
+            }
+        }
+        None
     }
+    search(root, line)
 }
 
 fn find_containing_function_name(root: &tree_sitter::Node, line: usize, source: &str) -> Option<String> {
@@ -130,21 +147,25 @@ fn find_containing_function_name(root: &tree_sitter::Node, line: usize, source: 
         .map(|s| s.to_string())
 }
 
-fn collect_functions<'t>(root: &tree_sitter::Node<'t>, source: &str) -> HashMap<String, tree_sitter::Node<'t>> {
-    let mut funcs = HashMap::new();
-    let mut cursor = root.walk();
-    loop {
-        let n = cursor.node();
-        if n.is_named() && n.kind() == "function_item" {
-            if let Some(name) = n.child_by_field_name("name")
+fn collect_functions<'t>(root: &tree_sitter::Node<'t>, source: &str) -> Vec<(String, usize, tree_sitter::Node<'t>)> {
+    fn search<'t>(node: &tree_sitter::Node<'t>, source: &str, out: &mut Vec<(String, usize, tree_sitter::Node<'t>)>) {
+        if node.is_named() && node.kind() == "function_item" {
+            if let Some(name) = node.child_by_field_name("name")
                 .and_then(|nn| nn.utf8_text(source.as_bytes()).ok())
             {
-                funcs.insert(name.to_string(), n);
+                out.push((name.to_string(), node.start_position().row + 1, *node));
             }
         }
-        if cursor.goto_first_child() { continue; }
-        loop { if cursor.goto_next_sibling() { break; } if !cursor.goto_parent() { break; } }
+        let mut cursor = node.walk();
+        if cursor.goto_first_child() {
+            loop {
+                search(&cursor.node(), source, out);
+                if !cursor.goto_next_sibling() { break; }
+            }
+        }
     }
+    let mut funcs = Vec::new();
+    search(root, source, &mut funcs);
     funcs
 }
 
@@ -237,68 +258,43 @@ fn extract_identifiers(node: &tree_sitter::Node, source: &[u8]) -> Vec<String> {
 }
 
 fn find_callee_in_stmt(stmt: &tree_sitter::Node, source: &str) -> Option<String> {
-    let mut cursor = stmt.walk();
-    loop {
-        let n = cursor.node();
+    let mut result = None;
+    walk_all(stmt, &mut |n| {
+        if result.is_some() { return; }
         if n.is_named() && n.kind() == "call_expression" {
             if let Some(callee) = n.child_by_field_name("function")
                 .and_then(|c| c.utf8_text(source.as_bytes()).ok())
             {
-                return Some(callee.to_string());
-            }
-            // fallback: 第一个 identifier
-            let mut cc = n.walk();
-            if cc.goto_first_child() {
-                loop {
-                    let ch = cc.node();
-                    if ch.is_named() && ch.kind() == "identifier" {
-                        if let Ok(name) = ch.utf8_text(source.as_bytes()) {
-                            return Some(name.to_string());
-                        }
-                    }
-                    if !cc.goto_next_sibling() { break; }
-                }
+                result = Some(callee.to_string());
             }
         }
-        if cursor.goto_first_child() { continue; }
-        loop { if cursor.goto_next_sibling() { break; } if !cursor.goto_parent() { break; } }
-    }
-    None
+    });
+    result
 }
 
-fn find_return_line(func_node: &tree_sitter::Node, _callee: &str, source: &str, tree: &tree_sitter::Tree) -> Option<usize> {
+fn find_return_line(func_node: &tree_sitter::Node, _callee: &str, _source: &str, _tree: &tree_sitter::Tree) -> Option<usize> {
     let stmts = flatten_stmts(func_node);
-    // 优先 return_statement
     for s in &stmts {
         if s.kind() == "return_statement" { return Some(s.start_position().row + 1); }
     }
-    // 取 block 最后一个 expression_statement（隐式返回）
-    let root = tree.root_node();
-    let mut cursor = root.walk();
-    loop {
-        let n = cursor.node();
-        if n == *func_node {
-            let mut cc = n.walk();
-            if cc.goto_first_child() {
-                loop {
-                    let child = cc.node();
-                    if child.is_named() && child.kind() == "block" {
-                        let mut bc = child.walk();
-                        let mut last: Option<tree_sitter::Node> = None;
-                        if bc.goto_first_child() {
-                            loop {
-                                let inner = bc.node();
-                                if inner.is_named() { last = Some(inner); }
-                                if !bc.goto_next_sibling() { break; }
-                            }
-                        }
-                        return last.map(|n| n.start_position().row + 1);
+    // 取 block 最后一个命名子节点（隐式返回）
+    let mut last = None;
+    let mut cursor = func_node.walk();
+    if cursor.goto_first_child() {
+        loop {
+            let child = cursor.node();
+            if child.is_named() && child.kind() == "block" {
+                let mut bc = child.walk();
+                if bc.goto_first_child() {
+                    loop {
+                        let inner = bc.node();
+                        if inner.is_named() { last = Some(inner); }
+                        if !bc.goto_next_sibling() { break; }
                     }
-                    if !cc.goto_next_sibling() { break; }
                 }
             }
+            if !cursor.goto_next_sibling() { break; }
         }
-        if cursor.goto_first_child() { continue; }
-        loop { if cursor.goto_next_sibling() { break; } if !cursor.goto_parent() { break; } }
     }
+    last.map(|n| n.start_position().row + 1)
 }

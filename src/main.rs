@@ -28,6 +28,12 @@ enum Commands {
         /// 将扫描结果写入被检测项目的 STATUS.md
         #[arg(long)]
         status: bool,
+        /// 启用 reflect 侦探分析（程序切片 + 数据流 + 依赖图）
+        #[arg(long)]
+        reflect: bool,
+        /// 启用 refactor 代码变换分析（死代码检测等）
+        #[arg(long)]
+        refactor: bool,
     },
     /// 列出可用检测规则
     ListRules,
@@ -51,7 +57,9 @@ fn all_rule_ids() -> Vec<&'static str> {
 fn main() {
     let cli = Cli::parse();
     let result = match cli.command {
-        Commands::Review { path, format, rules, status } => run_review(&path, &format, rules, status),
+        Commands::Review { path, format, rules, status, reflect, refactor } => {
+            run_review(&path, &format, rules, status, reflect, refactor)
+        }
         Commands::ListRules => run_list_rules(),
     };
 
@@ -61,7 +69,7 @@ fn main() {
     }
 }
 
-fn run_review(path: &str, format: &str, cli_rules: Option<Vec<String>>, write_status: bool) -> Result<(), String> {
+fn run_review(path: &str, format: &str, cli_rules: Option<Vec<String>>, write_status: bool, enable_reflect: bool, enable_refactor: bool) -> Result<(), String> {
     let root = resolve_root(path)?;
     let config = qtcloud_code_cli::config::load_contract(&root);
     let enabled_rules = qtcloud_code_cli::config::resolve_enabled_rules(&cli_rules, &config, &all_rule_ids());
@@ -88,6 +96,61 @@ fn run_review(path: &str, format: &str, cli_rules: Option<Vec<String>>, write_st
         let compiler_findings =
             qtcloud_code_cli::detect::unused_variable::check_compiler(&project_root, &enabled_rules)?;
         all_findings.extend(compiler_findings);
+    }
+
+    // reflect: 程序切片 + 数据流 + 依赖图分析
+    if enable_reflect {
+        for finding in &all_findings {
+            let file_path = &finding.file_path;
+            let source = match std::fs::read_to_string(file_path) {
+                Ok(s) => s,
+                Err(_) => continue,
+            };
+            if let Some(ext) = file_path.extension().and_then(|e| e.to_str()) {
+                if ext == "rs" {
+                    let mut parser = tree_sitter::Parser::new();
+                    if parser.set_language(&tree_sitter_rust::LANGUAGE.into()).is_err() { continue; }
+                    if let Some(tree) = parser.parse(&source, None) {
+                        let slice = qtcloud_code_cli::reflect::slice::backward_slice(
+                            &source, &tree, file_path, finding.line);
+                        if !slice.is_empty() {
+                            println!("  ├─ reflect 切片 ({} 条语句)", slice.len());
+                            for s in &slice {
+                                println!("  │  L{} {}", s.line, s.text);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // 依赖图分析
+        let dep = qtcloud_code_cli::reflect::depgraph::build_dep_graph(&root);
+        for node in &dep.nodes {
+            let reverse = qtcloud_code_cli::reflect::depgraph::reverse_dep_slice(&dep, node);
+            if !reverse.is_empty() {
+                println!("  ├─ depgraph: {} 被 {:?} 依赖", node, reverse);
+            }
+        }
+    }
+
+    // refactor: 死代码检测
+    if enable_refactor {
+        for file_path in &source_files {
+            let ext = file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
+            if ext != "rs" { continue; }
+            let source = match std::fs::read_to_string(file_path) {
+                Ok(s) => s,
+                Err(_) => continue,
+            };
+            let mut parser = tree_sitter::Parser::new();
+            if parser.set_language(&tree_sitter_rust::LANGUAGE.into()).is_err() { continue; }
+            if let Some(tree) = parser.parse(&source, None) {
+                let dead = qtcloud_code_cli::refactor::transform::detect_dead_code(&source, &tree);
+                for func in &dead {
+                    println!("  ├─ 死代码: {}:L{} `{}` 未被调用", file_path.display(), func.line, func.name);
+                }
+            }
+        }
     }
 
     write_output(format, &all_findings)?;

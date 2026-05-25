@@ -1,6 +1,17 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+fn walk_all<F: FnMut(tree_sitter::Node)>(node: &tree_sitter::Node, f: &mut F) {
+    f(*node);
+    let mut cursor = node.walk();
+    if cursor.goto_first_child() {
+        loop {
+            walk_all(&cursor.node(), f);
+            if !cursor.goto_next_sibling() { break; }
+        }
+    }
+}
+
 /// 符号表：符号定义 → 所有引用位置
 #[derive(Debug, Clone)]
 pub struct SymbolTable {
@@ -31,62 +42,56 @@ pub struct RefLocation {
 
 /// 构建符号表
 pub fn build_symbol_table(source: &str, tree: &tree_sitter::Tree, file: &Path) -> SymbolTable {
-    let mut symbols = Vec::new();
     let root = tree.root_node();
+    let mut symbols = Vec::new();
 
-    // 收集函数定义
-    let mut cursor = root.walk();
-    loop {
-        let n = cursor.node();
+    // 第一遍：收集函数定义
+    let mut func_defs: Vec<(String, usize)> = Vec::new();
+    walk_all(&root, &mut |n| {
         if n.is_named() && n.kind() == "function_item" {
             if let Some(name) = n.child_by_field_name("name")
                 .and_then(|nn| nn.utf8_text(source.as_bytes()).ok())
             {
-                let def_line = n.start_position().row + 1;
-                let mut refs = Vec::new();
-                // 在本文件中找所有调用
-                let mut c2 = root.walk();
-                loop {
-                    let n2 = c2.node();
-                    if n2.is_named() && n2.kind() == "call_expression" {
-                        if let Some(callee) = n2.child_by_field_name("function")
-                            .or_else(|| {
-                                let mut cc = n2.walk();
-                                if cc.goto_first_child() {
-                                    loop {
-                                        let ch = cc.node();
-                                        if ch.is_named() && ch.kind() == "identifier" {
-                                            return Some(ch);
-                                        }
-                                        if !cc.goto_next_sibling() { break; }
-                                    }
-                                }
-                                None
-                            })
-                            .and_then(|nn| nn.utf8_text(source.as_bytes()).ok())
-                        {
-                            if callee == name {
-                                refs.push(RefLocation {
-                                    file: file.to_path_buf(),
-                                    line: n2.start_position().row + 1,
-                                });
-                            }
-                        }
-                    }
-                    if c2.goto_first_child() { continue; }
-                    loop { if c2.goto_next_sibling() { break; } if !c2.goto_parent() { break; } }
-                }
-                symbols.push(Symbol {
-                    name: name.to_string(),
-                    kind: SymbolKind::Function,
-                    def_file: file.to_path_buf(),
-                    def_line,
-                    refs,
-                });
+                func_defs.push((name.to_string(), n.start_position().row + 1));
             }
         }
-        if cursor.goto_first_child() { continue; }
-        loop { if cursor.goto_next_sibling() { break; } if !cursor.goto_parent() { break; } }
+    });
+
+    // 第二遍：对每个函数找调用
+    for (name, def_line) in &func_defs {
+        let mut refs = Vec::new();
+        walk_all(&root, &mut |n| {
+            if n.is_named() && n.kind() == "call_expression" {
+                if let Some(callee) = n.child_by_field_name("function")
+                    .or_else(|| {
+                        let mut cc = n.walk();
+                        if cc.goto_first_child() {
+                            loop {
+                                let ch = cc.node();
+                                if ch.is_named() && ch.kind() == "identifier" { return Some(ch); }
+                                if !cc.goto_next_sibling() { break; }
+                            }
+                        }
+                        None
+                    })
+                    .and_then(|nn| nn.utf8_text(source.as_bytes()).ok())
+                {
+                    if callee == *name {
+                        refs.push(RefLocation {
+                            file: file.to_path_buf(),
+                            line: n.start_position().row + 1,
+                        });
+                    }
+                }
+            }
+        });
+        symbols.push(Symbol {
+            name: name.to_string(),
+            kind: SymbolKind::Function,
+            def_file: file.to_path_buf(),
+            def_line: *def_line,
+            refs,
+        });
     }
 
     SymbolTable { symbols }

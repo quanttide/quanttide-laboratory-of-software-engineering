@@ -46,35 +46,46 @@ pub fn trace_variable(
     path
 }
 
-fn collect_all_decls<'t>(root: &tree_sitter::Node<'t>, source: &str) -> HashMap<String, usize> {
+fn walk_all<F: FnMut(tree_sitter::Node)>(node: &tree_sitter::Node, f: &mut F) {
+    f(*node);
+    let mut cursor = node.walk();
+    if cursor.goto_first_child() {
+        loop {
+            walk_all(&cursor.node(), f);
+            if !cursor.goto_next_sibling() { break; }
+        }
+    }
+}
+
+fn collect_all_decls(root: &tree_sitter::Node, source: &str) -> HashMap<String, usize> {
     let mut decls = HashMap::new();
-    let mut cursor = root.walk();
-    loop {
-        let n = cursor.node();
+    walk_all(root, &mut |n| {
         if n.is_named() && n.kind() == "let_declaration" {
-            if let Some(name) = n.child_by_field_name("pattern")
-                .or_else(|| {
-                    let mut cc = n.walk();
-                    if cc.goto_first_child() {
-                        loop {
-                            let sub = cc.node();
-                            if sub.is_named() && sub.kind() == "identifier" {
-                                return Some(sub);
-                            }
-                            if !cc.goto_next_sibling() { break; }
-                        }
-                    }
-                    None
-                })
-                .and_then(|nn| nn.utf8_text(source.as_bytes()).ok())
-            {
+            if let Some(name) = extract_let_name(&n, source) {
                 decls.insert(name.to_string(), n.start_position().row + 1);
             }
         }
-        if cursor.goto_first_child() { continue; }
-        loop { if cursor.goto_next_sibling() { break; } if !cursor.goto_parent() { break; } }
-    }
+    });
     decls
+}
+
+fn extract_let_name<'t>(node: &tree_sitter::Node<'t>, source: &str) -> Option<String> {
+    if let Some(name) = node.child_by_field_name("pattern")
+        .and_then(|n| n.utf8_text(source.as_bytes()).ok())
+    {
+        return Some(name.to_string());
+    }
+    // fallback: 第一个 identifier
+    let mut result = None;
+    walk_all(node, &mut |n| {
+        if result.is_some() { return; }
+        if n.is_named() && n.kind() == "identifier" {
+            if let Ok(name) = n.utf8_text(source.as_bytes()) {
+                result = Some(name.to_string());
+            }
+        }
+    });
+    result
 }
 
 fn extract_stmt_at_line(root: &tree_sitter::Node, line: usize, source: &str) -> Option<String> {
