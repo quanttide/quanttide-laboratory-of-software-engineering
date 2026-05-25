@@ -1,6 +1,11 @@
 use std::collections::HashSet;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::fs;
+
+use crate::detect::{Finding, Severity};
+
+pub const RULE_ID: &str = "dep-graph";
+pub const DESCRIPTION: &str = "模块依赖图异常";
 
 /// 模块依赖图
 #[derive(Debug, Clone)]
@@ -152,4 +157,69 @@ fn file_to_module_path(file: &Path, root: &Path) -> String {
     }
 
     module.to_string()
+}
+
+pub fn check(graph: &DepGraph) -> Vec<Finding> {
+    let mut findings = Vec::new();
+    let file = PathBuf::from("src/");
+
+    // 1. 循环依赖检测
+    for (from, to) in &graph.edges {
+        if graph.edges.iter().any(|(f, t)| f == to && t == from) {
+            findings.push(Finding {
+                file_path: file.clone(),
+                line: 1, column: 1,
+                severity: Severity::Must,
+                rule_id: RULE_ID.to_string(),
+                message: format!("循环依赖: {} ↔ {}", from, to),
+            });
+        }
+    }
+
+    // 2. 高扇入（太多模块依赖它）
+    for node in &graph.nodes {
+        let fan_in = graph.edges.iter().filter(|(_, to)| to == node).count();
+        if fan_in > 5 {
+            findings.push(Finding {
+                file_path: file.clone(),
+                line: 1, column: 1,
+                severity: Severity::Should,
+                rule_id: RULE_ID.to_string(),
+                message: format!("高扇入: {} 被 {} 个模块依赖", node, fan_in),
+            });
+        }
+    }
+
+    // 3. 高扇出（依赖太多模块）
+    for node in &graph.nodes {
+        if node.is_empty() { continue; }
+        let fan_out = graph.edges.iter().filter(|(from, _)| from == node).count();
+        if fan_out > 5 {
+            findings.push(Finding {
+                file_path: file.clone(),
+                line: 1, column: 1,
+                severity: Severity::Should,
+                rule_id: RULE_ID.to_string(),
+                message: format!("高扇出: {} 依赖 {} 个模块", node, fan_out),
+            });
+        }
+    }
+
+    // 4. 孤立模块（无模块依赖它，也非根模块）
+    for node in &graph.nodes {
+        if node.is_empty() { continue; }
+        let fan_in = graph.edges.iter().filter(|(_, to)| to == node).count();
+        let fan_out = graph.edges.iter().filter(|(from, _)| from == node).count();
+        if fan_in == 0 && fan_out == 0 {
+            findings.push(Finding {
+                file_path: file.clone(),
+                line: 1, column: 1,
+                severity: Severity::May,
+                rule_id: RULE_ID.to_string(),
+                message: format!("孤立模块: {} 不被任何模块依赖", node),
+            });
+        }
+    }
+
+    findings
 }

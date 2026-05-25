@@ -52,6 +52,7 @@ fn all_rule_ids() -> Vec<&'static str> {
     ids.push(qtcloud_code_cli::detect::unused_variable::RULE_ID);
     ids.push(qtcloud_code_cli::detect::missing_tests::RULE_ID);
     ids.push(qtcloud_code_cli::detect::dead_code::RULE_ID);
+    ids.push(qtcloud_code_cli::detect::depgraph::RULE_ID);
     ids
 }
 
@@ -118,12 +119,7 @@ fn run_review(path: &str, format: &str, cli_rules: Option<Vec<String>>, write_st
             }
         }
         let dep = qtcloud_code_cli::detect::depgraph::build_dep_graph(&root);
-        for node in &dep.nodes {
-            let reverse = qtcloud_code_cli::detect::depgraph::reverse_dep_slice(&dep, node);
-            if !reverse.is_empty() {
-                println!("  ├─ depgraph: {} 被 {:?} 依赖", node, reverse);
-            }
-        }
+        all_findings.extend(qtcloud_code_cli::detect::depgraph::check(&dep));
     }
 
     // reflect: 以 finding 为起点的根因追溯
@@ -247,5 +243,6 @@ fn run_list_rules() -> Result<(), String> {
     println!("  {} — {}", qtcloud_code_cli::detect::unused_variable::RULE_ID, qtcloud_code_cli::detect::unused_variable::DESCRIPTION);
     println!("  {} — {}", qtcloud_code_cli::detect::missing_tests::RULE_ID, qtcloud_code_cli::detect::missing_tests::DESCRIPTION);
     println!("  {} — {}", qtcloud_code_cli::detect::dead_code::RULE_ID, qtcloud_code_cli::detect::dead_code::DESCRIPTION);
+    println!("  {} — {}", qtcloud_code_cli::detect::depgraph::RULE_ID, qtcloud_code_cli::detect::depgraph::DESCRIPTION);
     Ok(())
 }
