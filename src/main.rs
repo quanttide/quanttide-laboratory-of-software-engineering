@@ -1,5 +1,5 @@
 use std::io::{self};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process;
 
 use clap::{Parser, Subcommand};
@@ -22,6 +22,9 @@ enum Commands {
         path: String,
         #[arg(long, default_value = "terminal")]
         format: String,
+        /// 将扫描结果写入被检测项目的 STATUS.md
+        #[arg(long)]
+        status: bool,
     },
     /// 列出可用检测规则
     ListRules,
@@ -37,7 +40,7 @@ fn list_detectors() -> Vec<Box<dyn Detector>> {
 fn main() {
     let cli = Cli::parse();
     let result = match cli.command {
-        Commands::Scan { path, format } => run_scan(&path, &format),
+        Commands::Scan { path, format, status } => run_scan(&path, &format, status),
         Commands::ListRules => run_list_rules(),
     };
 
@@ -47,7 +50,7 @@ fn main() {
     }
 }
 
-fn run_scan(path: &str, format: &str) -> Result<(), String> {
+fn run_scan(path: &str, format: &str, write_status: bool) -> Result<(), String> {
     let root = Path::new(path);
     if !root.exists() {
         return Err(format!("路径不存在: {}", path));
@@ -104,7 +107,31 @@ fn run_scan(path: &str, format: &str) -> Result<(), String> {
         }
     }
 
+    if write_status {
+        let status_path = find_project_root(root).map(|p| p.join("STATUS.md"));
+        if let Some(status_path) = status_path {
+            let file = std::fs::File::create(&status_path)
+                .map_err(|e| format!("无法创建 STATUS.md: {}", e))?;
+            let mut writer = std::io::BufWriter::new(file);
+            qtcloud_code_cli::report::write_status(&mut writer, &all_findings)?;
+            println!("\nSTATUS.md 已写入: {}", status_path.display());
+        } else {
+            eprintln!("警告: 未找到项目根目录（Cargo.toml），跳过 STATUS.md 写入");
+        }
+    }
+
     Ok(())
+}
+
+fn find_project_root(path: &Path) -> Option<PathBuf> {
+    let mut current = Some(path.to_path_buf());
+    while let Some(dir) = current {
+        if dir.join("Cargo.toml").exists() {
+            return Some(dir);
+        }
+        current = dir.parent().map(|p| p.to_path_buf());
+    }
+    None
 }
 
 fn run_list_rules() -> Result<(), String> {
