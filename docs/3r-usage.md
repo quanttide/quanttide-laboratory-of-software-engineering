@@ -1,195 +1,106 @@
-# 3R 架构使用指南
+# reflect 工具 + LLM 使用指南
 
-## 概述
-
-3R 是三层递进的代码审查模型：**Review → Reflect → Refactor**。
+## 架构概览
 
 ```
-review → reflect → refactor
-  检测      理解      修复
+规则引擎 → finding（精确行号/级别/规则ID）
+     +
+reflect 工具 → 结构化证据（切片/数据流/展平）
+     +
+LLM → 洞察（安全分析/重复识别/一致性检查）
 ```
 
-每层可以在 CLI 中独立启用，下层不依赖上层。
+三层是**并行管道**，不是串行层级。证据和推理互补。
+
+## Reflect 工具
+
+### 程序切片（`backward_slice`）
+
+给定一个 finding 位置，反向追溯所有影响该点的语句。
 
 ```
-qtcloud-code review <path>               # review（默认）
-qtcloud-code review <path> --reflect     # review + reflect
-qtcloud-code review <path> --refactor    # review + refactor
-qtcloud-code review <path> --reflect --refactor  # 全部
+输入: 文件 + 行号
+输出: 影响该行的定义链
+
+示例: 从 L8 "total = price * qty" 追溯:
+  L6 let price = ...     ← price 的定义
+  L7 let qty = ...       ← qty 的定义
+  L8 let total = ...     ← 目标行
 ```
 
----
+### 数据流分析（`trace_variable`）
 
-## Review — 检测层
-
-**规则引擎扫描，确定性，无 LLM。**
-
-### 当前规则
-
-| 规则 ID | 级别 | 说明 |
-|---------|------|------|
-| `long-function` | MAY/SHOULD/MUST | 函数超过 30/50/80 行 |
-| `long-parameter-list` | MAY/SHOULD/MUST | 参数超过 4/6/9 个 |
-| `rust-wide-unsafe` | MAY/SHOULD/MUST | unsafe 块超过 3/5/8 条 |
-| `unused-variable` | SHOULD | 未使用变量（cargo check） |
-| `missing-tests` | MUST | 源文件缺少对应测试 |
-
-### 支持的语言
-
-Rust / Python / Go / Dart / TypeScript (TSX)
-
-### 命令
-
-```sh
-qtcloud-code review .
-qtcloud-code review . --format json
-qtcloud-code review . --rules long-function,missing-tests
-qtcloud-code review . --status
-```
-
----
-
-## Reflect — 侦探层
-
-**对 finding 做根因追溯。机械侦探（确定性）+ LLM 解释（可选）。**
-
-### 程序切片
-
-给定一个 finding 的位置，反向追溯所有影响该点的语句。
+追踪单个变量从源头到使用点的完整路径。
 
 ```
-输入: finding (file.rs:L53, "函数过长")
-过程: 从 L53 开始反向追溯变量定义链
-输出: 证据链 (SliceEntry 列表)
+输入: 文件 + 行号 + 变量名
+输出: 赋值链路
 
-示例:
-  1. process:L8  let mut sum = 0;
-  2. process:L11 let v = helper(*item);
-  3. process:L12 sum += v;
+示例: qty 的数据流
+  parts[2] → qty
+  trimmed.split(',') → parts
+  raw.trim() → trimmed
 ```
 
-**单函数切片**：在当前函数内追溯变量定义。**跨函数切片**：遇到函数调用时追溯被调用函数的 return。
+### 展平语句（`flatten_stmts`）
 
-### 数据流分析
-
-追踪变量的完整赋值路径：从使用点追溯到源头。
+将函数体内的所有可执行语句展开为线性列表，忽略嵌套结构。
 
 ```
-输入: 变量名 + 使用行号
-过程: 追溯 let 声明链
-输出: FlowEntry 列表 (var → from → line)
+输入: 函数节点
+输出: 语句列表
 
-示例:
-  layout ← alloc::Layout::new::<T>()
-  ptr    ← alloc(layout)
-  value  ← input
+示例 process_order:
+  1. let trimmed = raw.trim()
+  2. let parts = trimmed.split(',').collect()
+  3. let name = parts[0].trim()
+  4. let price = parts[1].trim().parse()...
+  5. let qty = parts[2].trim().parse()...
+  6. let total = price * qty as f64
+  7. Ok(format!(...))
 ```
 
-### 依赖图分析
+## 工具组合模式
 
-扫描项目源码中的 `mod`、`use`、`pub use` 声明，构建模块依赖图。
-
-```
-输入: 项目目录
-过程: 扫描 src/**/*.rs → 提取 mod/use/pub use
-输出: 依赖图 (节点 + 边)
-
-反向切片: 哪些模块依赖了目标模块
-正向切片: 目标模块影响了哪些下游
-
-示例:
-  api/handler.rs → service/processor.rs → data/pointer.rs
-```
-
-### 命令
-
-```sh
-qtcloud-code review . --reflect
-```
-
----
-
-## Refactor — 修复层
-
-**代码变换。机械变换（确定性）+ LLM 策略选择（可选）。**
-
-### 死代码检测
-
-扫描函数定义和调用，找出未被调用的函数。
+### 模式 1：安全分析
 
 ```
-输入: 源码
-过程: 收集所有函数 → 标记被调用的 → 输出未调用的
-输出: DeadFunc (name, line)
-
-注意事项:
-  - 测试框架调用的函数会被标记为"死代码"（静态分析限制）
-  - 特征方法会被标记为"死代码"（虚拟分派限制）
+backward_slice（从数组访问处追溯）+
+dataflow（追踪索引变量）
+  → LLM 发现：缺少长度检查，可能越界
 ```
 
-### 函数提取（实验性）
+验证结果：`parts[2]` 的行 → backward_slice 追溯 `parts` 来源 → dataflow 追踪 `qty` 源头 → LLM 发现 `parts.len()` 未检查。
 
-给定一个行号，识别可提取的最小完整语句。
-
-### 符号表
-
-扫描函数定义和调用点，构建定义→引用映射。用于重命名操作。
-
-### 安全机制
-
-| 功能 | 状态 |
-|------|------|
-| Patch 结构 | ✅ |
-| dry-run（只显示 diff） | ✅ |
-| apply 写文件 | ✅ |
-| rollback 回滚 | ✅ |
-
-### 命令
-
-```sh
-qtcloud-code review . --refactor
-```
-
----
-
-## 人机协作模型
+### 模式 2：重复模式识别
 
 ```
-AI   = 海量初级程序员（LLM + 规则引擎）
-人类 = 高级程序员（定策略、审结果、做判断）
+flatten_stmts（展平所有语句）
+  → LLM 发现：3 次 trim()、2 次 parse().map_err() 重复
 ```
 
-| 层 | AI 角色 | 人类角色 |
-|----|---------|----------|
-| review | 规则引擎批量扫描 | 配置规则、排除误报 |
-| reflect | 切片/数据流/依赖图（机械）+ LLM 因果解释（可选） | 阅读证据链，判断优先级 |
-| refactor | 死代码检测 + patch 生成（dry-run 默认） | 审核 patch、确认 apply |
+验证结果：8 条展平语句 → LLM 识别出 price 解析和 qty 解析用了完全相同的 try-parse 模式。
 
-## 模块结构
+### 模式 3：一致性检查
 
 ```
-src/
-├── main.rs              CLI 入口
-├── lib.rs               模块声明
-├── config.rs            配置加载 (.quanttide/code/contract.yaml)
-├── lang/                语言解析器
-│   └── {rust,python,go,dart,typescript}.rs
-├── detect/              检测器
-│   ├── long_function.rs
-│   ├── long_parameter_list.rs
-│   ├── unsafe_block.rs
-│   ├── unused_variable.rs
-│   └── missing_tests.rs
-├── reflect/             侦探引擎
-│   ├── mod.rs           EvidenceChain 类型
-│   ├── slice.rs         程序切片（单函数/跨函数）
-│   ├── dataflow.rs      数据流分析
-│   └── depgraph.rs      依赖图分析
-├── refactor/            变换引擎
-│   ├── mod.rs
-│   ├── transform.rs     死代码检测 + 边界识别
-│   ├── rename.rs        符号表 + 重命名
-│   └── safety.rs        Patch/dry-run/apply/rollback
-└── report/              输出格式
-    └── mod.rs           JSON / Terminal / STATUS.md
+dataflow × N（追踪多个变量路径）
+  → LLM 交叉对比：price 和 total 都依赖 parts[1]，错误传播范围过大
 ```
+
+验证结果：4 个变量的 dataflow 路径 → LLM 发现 qty 和 price 的解析错误都会让 total 出错。
+
+## 当前状态
+
+| 工具 | 成熟度 | 测试 |
+|------|--------|------|
+| `backward_slice` | ✅ 稳定 | 已测试 |
+| `flatten_stmts` | ✅ 稳定 | 已测试 |
+| `trace_variable` | ⚠️ 基本路径工作 | 已测试 |
+| `cross_function_slice` | ❌ 废弃 | 无测试 |
+| LLM prompt 模板 | ❌ 未注册 | 无 |
+
+## 下一步
+
+- 将验证有效的 prompt 模板注册到 `llm.rs`
+- 模板化：`analyse::security`、`analyse::consistency`、`analyse::duplicate`
