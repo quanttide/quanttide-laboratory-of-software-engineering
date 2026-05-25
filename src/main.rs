@@ -51,7 +51,6 @@ fn all_rule_ids() -> Vec<&'static str> {
     let mut ids: Vec<&str> = list_detectors().iter().map(|d| d.rule_id()).collect();
     ids.push(qtcloud_code_cli::detect::unused_variable::RULE_ID);
     ids.push(qtcloud_code_cli::detect::missing_tests::RULE_ID);
-    ids.push(qtcloud_code_cli::detect::dead_code::RULE_ID);
     ids.push(qtcloud_code_cli::detect::depgraph::RULE_ID);
     ids
 }
@@ -100,31 +99,6 @@ fn run_review(path: &str, format: &str, cli_rules: Option<Vec<String>>, write_st
         all_findings.extend(compiler_findings);
     }
 
-    // 项目级扫描：死代码
-    if enabled_rules.contains(&qtcloud_code_cli::detect::dead_code::RULE_ID.to_string()) {
-        for file_path in &source_files {
-            let ext = file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
-            if ext != "rs" { continue; }
-            let source = match std::fs::read_to_string(file_path) {
-                Ok(s) => s,
-                Err(_) => continue,
-            };
-            let mut parser = tree_sitter::Parser::new();
-            if parser.set_language(&tree_sitter_rust::LANGUAGE.into()).is_err() { continue; }
-            if let Some(tree) = parser.parse(&source, None) {
-                for func in qtcloud_code_cli::detect::dead_code::check_dead_code(&source, &tree) {
-                    all_findings.push(Finding {
-                        file_path: file_path.clone(),
-                        line: func.line,
-                        column: 1,
-                        severity: qtcloud_code_cli::detect::Severity::May,
-                        rule_id: qtcloud_code_cli::detect::dead_code::RULE_ID.to_string(),
-                        message: format!("函数 `{}` 未被调用", func.name),
-                    });
-                }
-            }
-        }
-    }
     // 项目级扫描：依赖图
     if enabled_rules.contains(&qtcloud_code_cli::detect::depgraph::RULE_ID.to_string()) {
         let dep = qtcloud_code_cli::detect::depgraph::build_dep_graph(&root);
@@ -251,7 +225,6 @@ fn run_list_rules() -> Result<(), String> {
     println!("\n可用检测规则（编译器级）:");
     println!("  {} — {}", qtcloud_code_cli::detect::unused_variable::RULE_ID, qtcloud_code_cli::detect::unused_variable::DESCRIPTION);
     println!("  {} — {}", qtcloud_code_cli::detect::missing_tests::RULE_ID, qtcloud_code_cli::detect::missing_tests::DESCRIPTION);
-    println!("  {} — {}", qtcloud_code_cli::detect::dead_code::RULE_ID, qtcloud_code_cli::detect::dead_code::DESCRIPTION);
     println!("  {} — {}", qtcloud_code_cli::detect::depgraph::RULE_ID, qtcloud_code_cli::detect::depgraph::DESCRIPTION);
     Ok(())
 }

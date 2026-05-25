@@ -11,21 +11,6 @@ repository = "https://github.com/quanttide/quanttide-laboratory-of-software-engi
 name = "qtcloud-code"
 path = "src/main.rs"
 
-[[bin]]
-name = "slice-exp"
-path = "src/bin/slice_exp.rs"
-
-[[bin]]
-name = "dep-exp"
-path = "src/bin/dep_exp.rs"
-
-[[bin]]
-name = "evidence-exp"
-path = "src/bin/evidence_exp.rs"
-
-[[bin]]
-name = "ast-refactor-exp"
-path = "src/bin/ast_refactor_exp.rs"
 
 [[test]]
 name = "review"

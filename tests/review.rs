@@ -171,19 +171,6 @@ fn test_review_reflect_flag() {
 }
 
 #[test]
-fn test_review_dead_code_rule() {
-    let fixture = fixture_path();
-    let output = cli()
-        .arg("review")
-        .arg(&fixture)
-        .arg("--rules")
-        .arg("dead-code")
-        .output()
-        .unwrap();
-    assert!(output.status.success());
-}
-
-#[test]
 fn test_review_dep_graph_rule() {
     let fixture = fixture_path();
     let output = cli()
@@ -215,7 +202,7 @@ fn test_review_dead_code_and_depgraph_together() {
         .arg("review")
         .arg(&fixture)
         .arg("--rules")
-        .arg("dead-code,dep-graph")
+        .arg("dep-graph")
         .arg("--format")
         .arg("json")
         .output()
@@ -278,7 +265,7 @@ fn test_review_with_all_project_rules() {
         .arg("review")
         .arg(&fixture)
         .arg("--rules")
-        .arg("missing-tests,dead-code,dep-graph,unused-variable")
+        .arg("missing-tests,dep-graph,unused-variable")
         .output()
         .unwrap();
     assert!(output.status.success());
