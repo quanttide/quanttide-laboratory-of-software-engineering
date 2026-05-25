@@ -1,41 +1,22 @@
-/// 实验：reflect→LLM 联动 — 过长函数职责分析
-/// 规则引擎发现过长函数（28行），LLM 通过展平语句分析职责并建议拆分
+/// 探索：backward_slice × dataflow × LLM
+/// 对函数内每个变量做反向追溯→LLM 解释完整数据流动
+
+use std::path::Path;
 
 #[tokio::main]
 async fn main() {
     let api_key = match qtcloud_code_cli::llm::get_api_key_from_vault().await {
-        Ok(key) => key,
-        Err(e) => { eprintln!("Vault 读取失败: {}", e); std::process::exit(1); }
+        Ok(k) => k,
+        Err(e) => { eprintln!("Vault 失败: {}", e); std::process::exit(1); }
     };
 
     let code = r#"
 fn process_order(raw: &str) -> Result<String, String> {
     let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        return Err("空输入".into());
-    }
     let parts: Vec<&str> = trimmed.split(',').collect();
-    if parts.len() < 3 {
-        return Err("字段不足".into());
-    }
     let name = parts[0].trim();
-    if name.is_empty() {
-        return Err("名称为空".into());
-    }
-    let price: f64 = match parts[1].trim().parse() {
-        Ok(v) => v,
-        Err(_) => return Err("价格格式错误".into()),
-    };
-    if price <= 0.0 {
-        return Err("价格必须大于 0".into());
-    }
-    let qty: i32 = match parts[2].trim().parse() {
-        Ok(v) => v,
-        Err(_) => return Err("数量格式错误".into()),
-    };
-    if qty <= 0 {
-        return Err("数量必须大于 0".into());
-    }
+    let price: f64 = parts[1].trim().parse().map_err(|_| "价格错误")?;
+    let qty: i32 = parts[2].trim().parse().map_err(|_| "数量错误")?;
     let total = price * qty as f64;
     Ok(format!("{}: {:.2} x {} = {:.2}", name, price, qty, total))
 }
@@ -46,53 +27,59 @@ fn process_order(raw: &str) -> Result<String, String> {
     let tree = parser.parse(code, None).unwrap();
     let root = tree.root_node();
 
-    // 找到 process_order 函数
+    // 找到函数
     let mut func = None;
     let mut c = root.walk();
     loop {
         let n = c.node();
         if n.is_named() && n.kind() == "function_item" {
-            if let Some(name) = n.child_by_field_name("name")
-                .and_then(|nn| nn.utf8_text(code.as_bytes()).ok())
-            {
-                if name == "process_order" { func = Some(n); break; }
-            }
+            func = Some(n); break;
         }
         if c.goto_first_child() { continue; }
         loop { if c.goto_next_sibling() { break; } if !c.goto_parent() { break; } }
     }
     let func = func.unwrap();
-
     let stmts = qtcloud_code_cli::reflect::slice::flatten_stmts(&func);
 
-    println!("=== finding ===");
-    println!("process_order 函数共 28 行（超过 15 行阈值），建议拆分");
+    // 对最后一行 total = price * qty 做切片，追溯每个变量
+    let target = stmts.iter()
+        .find(|s| s.utf8_text(code.as_bytes()).map(|t| t.contains("total")).unwrap_or(false))
+        .unwrap();
+    let target_line = target.start_position().row + 1;
 
-    println!("\n=== 展平语句（{} 条）===", stmts.len());
-    let ctx: String = stmts.iter().enumerate().map(|(i, s)| {
-        s.utf8_text(code.as_bytes()).map(|t| format!("{}. {}", i + 1, t)).unwrap_or_default()
-    }).collect::<Vec<_>>().join("\n");
-    println!("{}", ctx);
+    println!("=== 目标表达式 ===");
+    println!("L{} {}", target_line, target.utf8_text(code.as_bytes()).unwrap_or("?"));
 
-    if stmts.len() < 5 {
-        eprintln!("\n❌ reflect 失败：语句展平不足");
-        std::process::exit(1);
+    println!("\n=== backward_slice 追溯 ===");
+    let slice = qtcloud_code_cli::reflect::slice::backward_slice(code, &tree, Path::new("f.rs"), target_line);
+    for s in &slice {
+        println!("  L{} {}", s.line, s.text);
     }
-    println!("\n✅ reflect 展平了 {} 条语句", stmts.len());
 
-    // LLM 职责分析
-    println!("\n=== LLM 职责分析 ===");
+    // 数据流：为每个变量单独追溯
+    println!("\n=== dataflow 变量路径 ===");
+    for var in ["price", "qty", "name", "total"] {
+        let flow = qtcloud_code_cli::reflect::dataflow::trace_variable(code, &tree, target_line, var);
+        if !flow.is_empty() {
+            let path: Vec<String> = flow.iter().map(|f| format!("{}→{}", f.from, f.var)).collect();
+            println!("  {}: {}", var, path.join(" → "));
+        }
+    }
+
+    // LLM：用追溯结果解释完整数据流
+    let ctx: String = slice.iter()
+        .map(|s| format!("L{} {}", s.line, s.text))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    println!("\n=== LLM 数据流解释 ===");
     let prompt = format!(
-        "以下是一个过长函数的全部语句。请分析：\n\
-         1. 这个函数在做几件不同的事？每件从第几句到第几句？\n\
-         2. 建议拆成几个函数，每个函数名和职责？\n\n{}",
+        "以下是一个函数内从原始输入到最终输出的数据流动。\
+         请用自然语言描述数据是如何一步步变换的：\n\n{}",
         ctx
     );
     match qtcloud_code_cli::llm::enhance_finding(code, &prompt, &api_key).await {
-        Ok(enh) => {
-            println!("优先级: {}", enh.priority);
-            println!("{}", enh.explanation);
-        }
+        Ok(enh) => println!("{}", enh.explanation),
         Err(e) => eprintln!("LLM 错误: {}", e),
     }
 }
