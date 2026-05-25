@@ -1,6 +1,33 @@
 use serde::{Deserialize, Serialize};
 
 const DEEPSEEK_API: &str = "https://api.deepseek.com/v1/chat/completions";
+const VAULT_ADDR: &str = "http://127.0.0.1:8200";
+
+/// 从 Vault 读取 DeepSeek API Key
+pub async fn get_api_key_from_vault() -> Result<String, String> {
+    let token = std::env::var("VAULT_TOKEN")
+        .map_err(|_| "VAULT_TOKEN 环境变量未设置".to_string())?;
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .get(format!("{}/v1/secret/data/deepseek", VAULT_ADDR))
+        .header("X-Vault-Token", &token)
+        .send()
+        .await
+        .map_err(|e| format!("Vault 请求失败: {}", e))?;
+
+    let body: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("Vault 响应解析失败: {}", e))?;
+
+    let key = body["data"]["data"]["apiKey"]
+        .as_str()
+        .ok_or("Vault 中未找到 apiKey 字段")?
+        .to_string();
+
+    Ok(key)
+}
 
 #[derive(Serialize)]
 struct ChatRequest {
