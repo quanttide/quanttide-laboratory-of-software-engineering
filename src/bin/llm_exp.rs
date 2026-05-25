@@ -63,7 +63,7 @@ fn process_order(raw: &str) -> Result<String, String> {
     }
     let func = func.unwrap();
 
-    let stmts = qtcloud_code_cli::review::slice::flatten_stmts(&func);
+    let stmts = qtcloud_code_cli::reflect::slice::flatten_stmts(&func);
 
     println!("=== finding ===");
     println!("process_order 函数共 28 行（超过 15 行阈值），建议拆分");

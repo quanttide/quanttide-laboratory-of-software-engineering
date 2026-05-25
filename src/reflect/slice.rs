@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
-use crate::review::SliceEntry;
+use crate::reflect::SliceEntry;
 
 #[cfg(test)]
 mod tests {
