@@ -12,8 +12,8 @@ name = "qtcloud-code"
 path = "src/main.rs"
 
 [[test]]
-name = "scan"
-path = "tests/scan.rs"
+name = "review"
+path = "tests/review.rs"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }

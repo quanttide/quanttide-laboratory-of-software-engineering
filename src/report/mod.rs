@@ -57,7 +57,7 @@ pub fn write_status<W: Write>(writer: &mut W, findings: &[Finding]) -> Result<()
 
     writeln!(writer, "# Code Scan Status").map_err(|e| e.to_string())?;
     writeln!(writer).map_err(|e| e.to_string())?;
-    writeln!(writer, "> 自动生成于 qtcloud-code scan，时间戳: {}", timestamp).map_err(|e| e.to_string())?;
+    writeln!(writer, "> 自动生成于 qtcloud-code review，时间戳: {}", timestamp).map_err(|e| e.to_string())?;
     writeln!(writer).map_err(|e| e.to_string())?;
     writeln!(writer, "## 汇总").map_err(|e| e.to_string())?;
     writeln!(writer).map_err(|e| e.to_string())?;

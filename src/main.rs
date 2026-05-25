@@ -16,8 +16,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// 扫描目录中的代码文件，检测问题
-    Scan {
+    /// 审查目录中的代码文件，检测问题
+    Review {
         /// 目标目录
         path: String,
         #[arg(long, default_value = "terminal")]
@@ -40,7 +40,7 @@ fn list_detectors() -> Vec<Box<dyn Detector>> {
 fn main() {
     let cli = Cli::parse();
     let result = match cli.command {
-        Commands::Scan { path, format, status } => run_scan(&path, &format, status),
+        Commands::Review { path, format, status } => run_review(&path, &format, status),
         Commands::ListRules => run_list_rules(),
     };
 
@@ -50,7 +50,7 @@ fn main() {
     }
 }
 
-fn run_scan(path: &str, format: &str, write_status: bool) -> Result<(), String> {
+fn run_review(path: &str, format: &str, write_status: bool) -> Result<(), String> {
     let root = Path::new(path);
     if !root.exists() {
         return Err(format!("路径不存在: {}", path));
