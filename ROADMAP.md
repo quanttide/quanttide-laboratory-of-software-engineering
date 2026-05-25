@@ -17,6 +17,8 @@
 
 - [ ] 语言解析器抽象层（`LanguageParser` trait）
 - [ ] Python 支持（tree-sitter-python）
+- [ ] Go 支持（tree-sitter-go）
+- [ ] Dart 支持（tree-sitter-dart）
 - [ ] TypeScript/JavaScript 支持（tree-sitter-typescript）
 - [ ] 通用检测器：过长函数、过长参数列表、重复代码
 

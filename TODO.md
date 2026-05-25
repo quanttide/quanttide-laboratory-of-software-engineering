@@ -14,6 +14,8 @@
 
 - [ ] `LanguageParser` trait 提取，支持多语言
 - [ ] tree-sitter-python 绑定
+- [ ] tree-sitter-go 绑定
+- [ ] tree-sitter-dart 绑定
 - [ ] 通用检测器：过长函数、过长参数列表
 - [ ] `--rules` 选择启用的检测器
 - [ ] `.qtcloud-code.toml` 配置文件
