@@ -3,8 +3,8 @@ name = "qtcloud-code-cli"
 version = "0.1.0"
 edition = "2024"
 description = "多语言代码静态分析与质量检测 CLI"
-authors = ["Guo-Zhang <zhangguo@quanttide.com>"]
-license = "MIT"
+authors = ["QuantTide <opensource@quanttide.com>"]
+license = "Apache 2.0"
 repository = "https://github.com/quanttide/quanttide-laboratory-of-software-engineering"
 
 [[bin]]
