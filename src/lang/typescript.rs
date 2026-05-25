@@ -35,6 +35,36 @@ impl LanguageParser for TypeScriptParser {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ts_language_name() {
+        let parser = TypeScriptParser::new().unwrap();
+        assert_eq!(parser.language_name(), "TypeScript");
+    }
+
+    #[test]
+    fn test_ts_file_extensions() {
+        let parser = TypeScriptParser::new().unwrap();
+        assert_eq!(parser.file_extensions(), &["ts"]);
+    }
+
+    #[test]
+    fn test_ts_parse_valid() {
+        let mut parser = TypeScriptParser::new().unwrap();
+        let result = parser.parse(Path::new("f.ts"), "let x = 1").unwrap();
+        assert_eq!(result.file_path, "f.ts");
+    }
+
+    #[test]
+    fn test_ts_parse_empty() {
+        let mut parser = TypeScriptParser::new().unwrap();
+        assert!(parser.parse(Path::new("f.ts"), "").is_some());
+    }
+}
+
 pub struct TsxParser {
     parser: tree_sitter::Parser,
 }
@@ -65,5 +95,29 @@ impl LanguageParser for TsxParser {
             tree,
             source: source.to_string(),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests_tsx {
+    use super::*;
+
+    #[test]
+    fn test_tsx_language_name() {
+        let parser = TsxParser::new().unwrap();
+        assert_eq!(parser.language_name(), "TSX");
+    }
+
+    #[test]
+    fn test_tsx_file_extensions() {
+        let parser = TsxParser::new().unwrap();
+        assert_eq!(parser.file_extensions(), &["tsx"]);
+    }
+
+    #[test]
+    fn test_tsx_parse_valid() {
+        let mut parser = TsxParser::new().unwrap();
+        let result = parser.parse(Path::new("f.tsx"), "const x: number = 1").unwrap();
+        assert_eq!(result.file_path, "f.tsx");
     }
 }

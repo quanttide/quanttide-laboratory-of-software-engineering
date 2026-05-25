@@ -34,3 +34,33 @@ impl LanguageParser for GoParser {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_language_name() {
+        let parser = GoParser::new().unwrap();
+        assert_eq!(parser.language_name(), "Go");
+    }
+
+    #[test]
+    fn test_file_extensions() {
+        let parser = GoParser::new().unwrap();
+        assert_eq!(parser.file_extensions(), &["go"]);
+    }
+
+    #[test]
+    fn test_parse_valid() {
+        let mut parser = GoParser::new().unwrap();
+        let result = parser.parse(Path::new("f.go"), "package main").unwrap();
+        assert_eq!(result.file_path, "f.go");
+    }
+
+    #[test]
+    fn test_parse_empty() {
+        let mut parser = GoParser::new().unwrap();
+        assert!(parser.parse(Path::new("f.go"), "").is_some());
+    }
+}

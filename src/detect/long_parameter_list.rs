@@ -154,3 +154,42 @@ fn find_identifier_in_children(node: &tree_sitter::Node, source: &str) -> Option
     }
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    fn make_rust_tree(source: &str) -> (String, tree_sitter::Tree) {
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&tree_sitter_rust::LANGUAGE.into()).unwrap();
+        let tree = parser.parse(source, None).unwrap();
+        (source.to_string(), tree)
+    }
+
+    #[test]
+    fn test_few_params_no_finding() {
+        let (source, tree) = make_rust_tree("fn f(a: i32, b: i32) {}");
+        let findings = LongParameterListDetector.detect(&source, &tree, &PathBuf::from("f.rs"));
+        assert!(findings.is_empty());
+    }
+
+    #[test]
+    fn test_many_params_should() {
+        let (source, tree) = make_rust_tree("fn f(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32, g: i32) {}");
+        let findings = LongParameterListDetector.detect(&source, &tree, &PathBuf::from("f.rs"));
+        assert!(!findings.is_empty());
+        assert_eq!(findings[0].severity, Severity::Should);
+    }
+
+    #[test]
+    fn test_classify() {
+        assert_eq!(classify(2), None);
+        assert_eq!(classify(4), None);
+        assert_eq!(classify(5), Some(Severity::May));
+        assert_eq!(classify(6), Some(Severity::May));
+        assert_eq!(classify(7), Some(Severity::Should));
+        assert_eq!(classify(9), Some(Severity::Should));
+        assert_eq!(classify(10), Some(Severity::Must));
+    }
+}

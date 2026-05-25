@@ -47,8 +47,19 @@ fn count_block_statements(node: &tree_sitter::Node) -> usize {
     }
     loop {
         let child = cursor.node();
-        if child.kind().ends_with("_statement") || child.kind() == "expression_statement" {
-            count += 1;
+        if child.kind() == "block" {
+            let mut cc = child.walk();
+            if cc.goto_first_child() {
+                loop {
+                    let stmt = cc.node();
+                    if stmt.kind().ends_with("_statement") || stmt.kind() == "expression_statement" {
+                        count += 1;
+                    }
+                    if !cc.goto_next_sibling() {
+                        break;
+                    }
+                }
+            }
         }
         if !cursor.goto_next_sibling() {
             break;
@@ -66,5 +77,46 @@ fn classify(stmts: usize) -> Option<Severity> {
         Some(Severity::May)
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    fn make_rust_tree(source: &str) -> (String, tree_sitter::Tree) {
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&tree_sitter_rust::LANGUAGE.into()).unwrap();
+        let tree = parser.parse(source, None).unwrap();
+        (source.to_string(), tree)
+    }
+
+    #[test]
+    fn test_small_unsafe_no_finding() {
+        let (source, tree) = make_rust_tree("unsafe { f(1); }");
+        let findings = UnsafeBlockDetector.detect(&source, &tree, &PathBuf::from("f.rs"));
+        assert!(findings.is_empty());
+    }
+
+    #[test]
+    fn test_wide_unsafe_should() {
+        let stmts = (0..6).map(|i| format!("  f({});", i)).collect::<Vec<_>>().join("\n");
+        let source = format!("unsafe {{\n{}\n}}", stmts);
+        let (s, tree) = make_rust_tree(&source);
+        let findings = UnsafeBlockDetector.detect(&s, &tree, &PathBuf::from("f.rs"));
+        assert!(!findings.is_empty());
+        assert_eq!(findings[0].severity, Severity::Should);
+    }
+
+    #[test]
+    fn test_classify() {
+        assert_eq!(classify(2), None);
+        assert_eq!(classify(3), None);
+        assert_eq!(classify(4), Some(Severity::May));
+        assert_eq!(classify(5), Some(Severity::May));
+        assert_eq!(classify(6), Some(Severity::Should));
+        assert_eq!(classify(8), Some(Severity::Should));
+        assert_eq!(classify(9), Some(Severity::Must));
     }
 }

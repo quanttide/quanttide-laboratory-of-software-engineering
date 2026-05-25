@@ -92,3 +92,45 @@ fn find_identifier_in_children(node: &tree_sitter::Node, source: &str) -> Option
     }
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    fn make_rust_tree(source: &str) -> (String, tree_sitter::Tree) {
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&tree_sitter_rust::LANGUAGE.into()).unwrap();
+        let tree = parser.parse(source, None).unwrap();
+        (source.to_string(), tree)
+    }
+
+    #[test]
+    fn test_short_function_no_finding() {
+        let (source, tree) = make_rust_tree("fn f() {}");
+        let findings = LongFunctionDetector.detect(&source, &tree, &PathBuf::from("f.rs"));
+        assert!(findings.is_empty());
+    }
+
+    #[test]
+    fn test_long_function_may() {
+        let src = (0..35).map(|i| format!("  let x{} = 1;", i)).collect::<Vec<_>>().join("\n");
+        let source = format!("fn f() {{\n{}\n}}", src);
+        let (s, tree) = make_rust_tree(&source);
+        let findings = LongFunctionDetector.detect(&s, &tree, &PathBuf::from("f.rs"));
+        assert!(!findings.is_empty());
+        assert_eq!(findings[0].severity, Severity::May);
+        assert_eq!(findings[0].rule_id, "long-function");
+    }
+
+    #[test]
+    fn test_classify() {
+        assert_eq!(classify(10), None);
+        assert_eq!(classify(30), None);
+        assert_eq!(classify(31), Some(Severity::May));
+        assert_eq!(classify(50), Some(Severity::May));
+        assert_eq!(classify(51), Some(Severity::Should));
+        assert_eq!(classify(80), Some(Severity::Should));
+        assert_eq!(classify(81), Some(Severity::Must));
+    }
+}

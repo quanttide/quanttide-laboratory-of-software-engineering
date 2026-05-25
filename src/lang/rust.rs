@@ -34,3 +34,34 @@ impl LanguageParser for RustParser {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_language_name() {
+        let parser = RustParser::new().unwrap();
+        assert_eq!(parser.language_name(), "Rust");
+    }
+
+    #[test]
+    fn test_file_extensions() {
+        let parser = RustParser::new().unwrap();
+        assert_eq!(parser.file_extensions(), &["rs"]);
+    }
+
+    #[test]
+    fn test_parse_valid() {
+        let mut parser = RustParser::new().unwrap();
+        let result = parser.parse(Path::new("f.rs"), "fn f() {}").unwrap();
+        assert_eq!(result.file_path, "f.rs");
+        assert_eq!(result.source, "fn f() {}");
+    }
+
+    #[test]
+    fn test_parse_empty() {
+        let mut parser = RustParser::new().unwrap();
+        assert!(parser.parse(Path::new("f.rs"), "").is_some());
+    }
+}

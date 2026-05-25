@@ -34,3 +34,33 @@ impl LanguageParser for DartParser {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_language_name() {
+        let parser = DartParser::new().unwrap();
+        assert_eq!(parser.language_name(), "Dart");
+    }
+
+    #[test]
+    fn test_file_extensions() {
+        let parser = DartParser::new().unwrap();
+        assert_eq!(parser.file_extensions(), &["dart"]);
+    }
+
+    #[test]
+    fn test_parse_valid() {
+        let mut parser = DartParser::new().unwrap();
+        let result = parser.parse(Path::new("f.dart"), "void f() {}").unwrap();
+        assert_eq!(result.file_path, "f.dart");
+    }
+
+    #[test]
+    fn test_parse_empty() {
+        let mut parser = DartParser::new().unwrap();
+        assert!(parser.parse(Path::new("f.dart"), "").is_some());
+    }
+}

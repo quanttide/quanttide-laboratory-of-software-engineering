@@ -45,3 +45,52 @@ pub fn resolve_enabled_rules(
 
     all_rules.iter().map(|s| s.to_string()).collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cli_rules_take_precedence() {
+        let cli = Some(vec!["rule-a".to_string()]);
+        let config = Some(ContractConfig {
+            code: Some(CodeConfig {
+                rules: Some(vec!["rule-b".to_string()]),
+            }),
+        });
+        let all = &["rule-a", "rule-b", "rule-c"];
+        let result = resolve_enabled_rules(&cli, &config, all);
+        assert_eq!(result, vec!["rule-a"]);
+    }
+
+    #[test]
+    fn test_config_rules_when_no_cli() {
+        let cli: Option<Vec<String>> = None;
+        let config = Some(ContractConfig {
+            code: Some(CodeConfig {
+                rules: Some(vec!["rule-b".to_string()]),
+            }),
+        });
+        let all = &["rule-a", "rule-b", "rule-c"];
+        let result = resolve_enabled_rules(&cli, &config, all);
+        assert_eq!(result, vec!["rule-b"]);
+    }
+
+    #[test]
+    fn test_default_all_rules() {
+        let cli: Option<Vec<String>> = None;
+        let config: Option<ContractConfig> = None;
+        let all = &["rule-a", "rule-b"];
+        let result = resolve_enabled_rules(&cli, &config, all);
+        assert_eq!(result, vec!["rule-a", "rule-b"]);
+    }
+
+    #[test]
+    fn test_config_without_rules_field() {
+        let cli: Option<Vec<String>> = None;
+        let config = Some(ContractConfig { code: None });
+        let all = &["rule-a"];
+        let result = resolve_enabled_rules(&cli, &config, all);
+        assert_eq!(result, vec!["rule-a"]);
+    }
+}

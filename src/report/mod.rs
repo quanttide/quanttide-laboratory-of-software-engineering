@@ -87,6 +87,83 @@ fn write_status_summary<W: Write>(writer: &mut W, findings: &[Finding]) -> Resul
     writeln_err!(writer)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    fn sample_findings() -> Vec<Finding> {
+        vec![
+            Finding {
+                file_path: PathBuf::from("src/main.rs"),
+                line: 10,
+                column: 5,
+                severity: Severity::Should,
+                rule_id: "long-function".into(),
+                message: "函数 `run` 共 55 行".into(),
+            },
+            Finding {
+                file_path: PathBuf::from("src/lib.rs"),
+                line: 3,
+                column: 1,
+                severity: Severity::May,
+                rule_id: "long-parameter-list".into(),
+                message: "函数 `f` 有 5 个参数".into(),
+            },
+        ]
+    }
+
+    #[test]
+    fn test_json_output_valid() {
+        let findings = sample_findings();
+        let mut buf = Vec::new();
+        write_json(&mut buf, &findings).unwrap();
+        let output: serde_json::Value = serde_json::from_slice(&buf).unwrap();
+        assert!(output.is_array());
+        assert_eq!(output.as_array().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn test_terminal_output_empty() {
+        let mut buf = Vec::new();
+        write_terminal(&mut buf, &[]).unwrap();
+        let output = String::from_utf8_lossy(&buf);
+        assert!(output.contains("未发现问题"));
+    }
+
+    #[test]
+    fn test_terminal_output_with_findings() {
+        let findings = sample_findings();
+        let mut buf = Vec::new();
+        write_terminal(&mut buf, &findings).unwrap();
+        let output = String::from_utf8_lossy(&buf);
+        assert!(output.contains("SHOULD"));
+        assert!(output.contains("MAY"));
+    }
+
+    #[test]
+    fn test_status_output() {
+        let findings = sample_findings();
+        let mut buf = Vec::new();
+        write_status(&mut buf, &findings).unwrap();
+        let output = String::from_utf8_lossy(&buf);
+        assert!(output.contains("Code Scan Status"));
+        assert!(output.contains("MUST"));
+        assert!(output.contains("SHOULD"));
+        assert!(output.contains("MAY"));
+        assert!(output.contains("src/main.rs"));
+        assert!(output.contains("src/lib.rs"));
+    }
+
+    #[test]
+    fn test_status_output_empty() {
+        let mut buf = Vec::new();
+        write_status(&mut buf, &[]).unwrap();
+        let output = String::from_utf8_lossy(&buf);
+        assert!(output.contains("未发现问题"));
+    }
+}
+
 fn write_status_details<W: Write>(writer: &mut W, findings: &[Finding]) -> Result<(), String> {
     writeln_err!(writer, "## 详情")?;
     writeln_err!(writer)?;

@@ -34,3 +34,33 @@ impl LanguageParser for PythonParser {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_language_name() {
+        let parser = PythonParser::new().unwrap();
+        assert_eq!(parser.language_name(), "Python");
+    }
+
+    #[test]
+    fn test_file_extensions() {
+        let parser = PythonParser::new().unwrap();
+        assert_eq!(parser.file_extensions(), &["py"]);
+    }
+
+    #[test]
+    fn test_parse_valid() {
+        let mut parser = PythonParser::new().unwrap();
+        let result = parser.parse(Path::new("f.py"), "x = 1").unwrap();
+        assert_eq!(result.file_path, "f.py");
+    }
+
+    #[test]
+    fn test_parse_empty() {
+        let mut parser = PythonParser::new().unwrap();
+        assert!(parser.parse(Path::new("f.py"), "").is_some());
+    }
+}

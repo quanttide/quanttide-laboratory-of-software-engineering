@@ -33,6 +33,53 @@ fn test_review_default_repo() {
         .arg(&fixture)
         .output()
         .unwrap();
-    // 当前 review 仅为骨架，后续实装后验证检测结果
     assert!(output.status.success());
+}
+
+#[test]
+fn test_review_json_format() {
+    let fixture = fixture_path();
+    let output = cli()
+        .arg("review")
+        .arg(&fixture)
+        .arg("--format")
+        .arg("json")
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let parsed: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert!(parsed.is_array());
+}
+
+#[test]
+fn test_review_with_rules_filter() {
+    let fixture = fixture_path();
+    let output = cli()
+        .arg("review")
+        .arg(&fixture)
+        .arg("--rules")
+        .arg("long-function")
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_review_invalid_path() {
+    let output = cli()
+        .arg("review")
+        .arg("/nonexistent/path")
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+}
+
+#[test]
+fn test_list_rules() {
+    let output = cli().arg("list-rules").output().unwrap();
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("long-function"));
+    assert!(stdout.contains("unused-variable"));
 }
