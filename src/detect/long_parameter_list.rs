@@ -224,4 +224,25 @@ mod tests {
         let findings = LongParameterListDetector.detect(source, &tree, &PathBuf::from("f.go"));
         assert!(findings.is_empty());
     }
+
+    #[test]
+    fn test_dart_many_params() {
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&tree_sitter_dart::LANGUAGE.into()).unwrap();
+        let source = "void f(a, b, c, d, e, f, g) {}";
+        let tree = parser.parse(source, None).unwrap();
+        let findings = LongParameterListDetector.detect(source, &tree, &PathBuf::from("f.dart"));
+        assert!(!findings.is_empty());
+        assert_eq!(findings[0].severity, Severity::Should);
+    }
+
+    #[test]
+    fn test_dart_few_params_no_finding() {
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&tree_sitter_dart::LANGUAGE.into()).unwrap();
+        let source = "void f(a, b) {}";
+        let tree = parser.parse(source, None).unwrap();
+        let findings = LongParameterListDetector.detect(source, &tree, &PathBuf::from("f.dart"));
+        assert!(findings.is_empty());
+    }
 }

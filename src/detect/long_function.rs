@@ -133,4 +133,17 @@ mod tests {
         assert_eq!(classify(80), Some(Severity::Should));
         assert_eq!(classify(81), Some(Severity::Must));
     }
+
+    #[test]
+    fn test_dart_function_name_extracted() {
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&tree_sitter_dart::LANGUAGE.into()).unwrap();
+        let body: String = (0..33).map(|i| format!("  var x{} = {};", i, i)).collect::<Vec<_>>().join("\n");
+        let source = format!("void long() {{\n{}\n}}", body);
+        let tree = parser.parse(&source, None).unwrap();
+        let findings = LongFunctionDetector.detect(&source, &tree, &PathBuf::from("f.dart"));
+        assert!(!findings.is_empty());
+        assert_eq!(findings[0].severity, Severity::May);
+        assert!(findings[0].message.contains("long"), "Dart function name should be 'long', got: {}", findings[0].message);
+    }
 }
