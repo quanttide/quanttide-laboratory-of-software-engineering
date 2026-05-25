@@ -11,6 +11,10 @@ repository = "https://github.com/quanttide/quanttide-laboratory-of-software-engi
 name = "qtcloud-code"
 path = "src/main.rs"
 
+[[bin]]
+name = "slice-exp"
+path = "src/bin/slice_exp.rs"
+
 [[test]]
 name = "review"
 path = "tests/review.rs"
