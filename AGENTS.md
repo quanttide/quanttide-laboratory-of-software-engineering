@@ -1,90 +1,67 @@
-# AGENTS — qtcloud-code-cli
+# AGENTS — qtcloud-code-cli（实验室）
 
-## 架构原则
+## 架构
 
-- 纯规则引擎，不依赖 LLM
-- 面向「可检测、可复现、可自动化」
-- P0 阶段只做 Rust，再扩展多语言（已支持 Python/Go/Dart/TypeScript）
-- 做检测，不做自动修复
-- 自举（`qtcloud-code review .`）驱动质量反馈
+```
+规则引擎 → finding（确定、可复现）
+     +
+reflect 工具 → 结构化证据（切片/数据流/展平语句）
+     +
+LLM → 洞察（安全分析、重复识别、一致性检查）
+```
+
+三层是**并行管道**，不是串行层级。
+
+## 模块结构（实验室）
+
+```
+src/
+├── lib.rs            模块入口
+├── reflect/          确定性分析工具
+│   ├── mod.rs        SliceEntry, FlowEntry 类型
+│   ├── slice.rs      backward_slice, flatten_stmts, cross_function_slice
+│   └── dataflow.rs   trace_variable
+├── llm.rs            DeepSeek LLM 客户端（从 Vault 读取密钥）
+└── bin/llm_exp.rs    reflect × LLM 组合实验
+```
+
+## 已验证的工具组合模式
+
+### 模式 1：backward_slice + dataflow → 安全分析
+从数组访问处追溯变量来源 + dataflow → LLM 发现越界风险。
+
+### 模式 2：flatten_stmts → 重复模式识别
+展平语句 → LLM 识别重复的解析/验证模式。
+
+### 模式 3：dataflow × N → 一致性检查
+追踪多个变量路径 → LLM 交叉对比发现错误传播问题。
+
+## LLM 集成
+
+- 客户端：`llm.rs`，使用 `reqwest` 调用 DeepSeek API
+- 密钥：从 Vault 读取（`VAULT_TOKEN` 环境变量），路径 `secret/data/deepseek`，字段 `apiKey`
+- 当前为实验阶段，prompt 模板未注册
 
 ## 发现分级
 
-遵循 RFC 2119 语义：
-
-| 级别 | 含义 | 举例 |
-|------|------|------|
-| **MUST** | 可能引入 bug，必须审查 | unsafe 块 >8 条 |
-| **SHOULD** | 维护负担，建议重构 | 函数 >50 行 |
-| **MAY** | 风格建议，可选采纳 | 函数 >30 行 |
-
-同一规则可输出多个级别，取决于超标程度。例如函数 70 行输出 SHOULD，110 行输出 MUST。
-
-## 检测器分类
-
-| 类型 | 特征 | 举例 |
-|------|------|------|
-| **文件级** | 遍历单文件 AST，统一用 `walk_tree` | 过长函数、unsafe 块、过长参数列表 |
-| **项目级** | 需要项目上下文，独立于文件循环调用 | 未使用变量（`cargo check`）、缺失测试 |
-
-### 跨语言检测注意事项
-
-不同语言 tree-sitter 节点结构差异大，检测器需处理：
-- **Rust** `function_item` → `parameters` → `parameter`（每个参数独立节点）
-- **Python** `function_definition` → `parameters`（与 Rust 结构兼容）
-- **Go** `function_declaration` → `parameters` → `parameter_declaration` → 多个 `identifier`（共享类型声明）
-- **Dart** `function_declaration` → `function_signature` → `identifier`（函数名在孙子节点）
-- **TypeScript** 同 Go/Dart 的 `function_declaration` 结构
-
-优先使用 `child_by_field_name("parameters")`，必须为各语言准备 fallback。
-
-### 配置驱动排除
-
-三层过滤减少检测噪音：
-1. 硬编码跳过（`target/`、`.git/`、非源码扩展名）
-2. 启发式判断（inline test、external test file）
-3. 用户配置排除（`.quanttide/code/contract.yaml` 的 `exclude` 字段）
+| 级别 | 含义 |
+|------|------|
+| **MUST** | 可能引入 bug |
+| **SHOULD** | 维护负担 |
+| **MAY** | 风格建议 |
 
 ## 测试
 
 ```sh
-# 单元测试 + 集成测试
-cargo test
-
-# 覆盖率（目标 >90%）
-cargo llvm-cov
+cargo test        # 11 个单元测试
+cargo llvm-cov    # 覆盖率
 ```
 
-### 覆盖策略
+## 跨语言检测注意事项
 
-| 类型 | 目标 | 方法 |
-|------|------|------|
-| **纯函数** | ~100% | 直接测阈值、解析逻辑 |
-| **文件级检测器** | >90% | 各语言 parser + 场景覆盖 |
-| **项目级检测器** | >90% | 拆出纯函数单独测 |
-| **CLI 错误路径** | ~80% | 集成测试覆盖主要路径，余留 5% 不追 |
-
-## 模块结构
-
-```
-src/
-├── main.rs          # CLI 入口 (clap)
-├── lib.rs           # 公开模块
-├── config.rs        # .quanttide/code/contract.yaml 配置加载
-├── lang/            # 语言解析器抽象与实现
-│   ├── mod.rs       # LanguageParser trait + ParseResult
-│   ├── rust.rs      # RustParser
-│   ├── python.rs    # PythonParser
-│   ├── go.rs        # GoParser
-│   ├── dart.rs      # DartParser
-│   └── typescript.rs # TypeScriptParser + TsxParser
-├── detect/          # 检测器
-│   ├── mod.rs       # Detector trait + Finding + walk_tree
-│   ├── long_function.rs
-│   ├── long_parameter_list.rs
-│   ├── unsafe_block.rs
-│   ├── unused_variable.rs   # 项目级：cargo check 解析
-│   └── missing_tests.rs      # 项目级：源文件/测试映射
-└── report/          # 输出格式
-    └── mod.rs       # JSON / Terminal / STATUS.md
-```
+不同语言 tree-sitter 节点结构差异大（当前实验仅验证 Rust）：
+- **Rust** `function_item` → `parameters` → `parameter`
+- **Python** `function_definition` → `parameters`
+- **Go** `function_declaration` → `parameters` → `parameter_declaration`
+- **Dart** `function_declaration` → `function_signature` → `identifier`
+- **TypeScript** 同 Go/Dart
