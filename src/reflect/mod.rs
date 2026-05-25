@@ -16,3 +16,4 @@ pub struct FlowEntry {
 
 pub mod slice;
 pub mod dataflow;
+pub mod analysis;
