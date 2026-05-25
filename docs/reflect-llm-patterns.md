@@ -87,6 +87,23 @@ reflect 工具链 → 结构化证据 → LLM 推理
 
 关键原则：**reflect 工具产生 LLM 无法自己生成的证据**（精确的行号、变量链、调用关系），LLM 在证据基础上做**规则引擎做不到的推理**。
 
+## 后续方向：Skill 封装
+
+每种验证有效的工具组合模式（安全分析、重复识别、一致性检查）本质上是一个**可复用的 prompt + 工具调用模板**。未来应注册为 Skill：
+
+```
+.agents/skills/analyse-security/SKILL.md
+  → backward_slice + dataflow + 安全 prompt
+
+.agents/skills/analyse-duplicate/SKILL.md
+  → flatten_stmts + 重复 prompt
+
+.agents/skills/analyse-consistency/SKILL.md
+  → dataflow × N + 一致性 prompt
+```
+
+Skill = prompt + 元数据（名字、描述、作用域、调用方式）。实验室验证的模式直接作为 Skill 注册，工具集成后无需额外代码接入。
+
 ## 当前限制
 
 1. call_graph 统计含第三方库调用，需过滤
