@@ -195,3 +195,108 @@ fn test_review_dep_graph_rule() {
         .unwrap();
     assert!(output.status.success());
 }
+
+#[test]
+fn test_review_reflect_with_empty_dir() {
+    let dir = tempfile::tempdir().unwrap();
+    let output = cli()
+        .arg("review")
+        .arg(dir.path())
+        .arg("--reflect")
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_review_dead_code_and_depgraph_together() {
+    let fixture = fixture_path();
+    let output = cli()
+        .arg("review")
+        .arg(&fixture)
+        .arg("--rules")
+        .arg("dead-code,dep-graph")
+        .arg("--format")
+        .arg("json")
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_review_status_without_cargo_project() {
+    let dir = tempfile::tempdir().unwrap();
+    let sub = dir.path().join("sub");
+    std::fs::create_dir(&sub).unwrap();
+    std::fs::write(sub.join("f.rs"), "pub fn f() {}\n").unwrap();
+    // 没有 Cargo.toml → find_project_root 返回 None → STATUS.md 不会创建
+    let output = cli()
+        .arg("review")
+        .arg(&sub)
+        .arg("--status")
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    // 没有 STATUS.md 被创建
+    assert!(!dir.path().join("STATUS.md").exists());
+}
+
+#[test]
+fn test_review_with_invalid_rust_syntax() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("bad.rs"), "fn f(}").unwrap();
+    let output = cli()
+        .arg("review")
+        .arg(dir.path())
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_review_status_with_cargo_in_parent_find_none() {
+    // 测试在 Cargo 项目的子目录中运行 --status
+    // find_project_root 从子目录往上能找到 Cargo.toml
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("Cargo.toml"), "[package]\nname = \"x\"\nversion = \"0.1.0\"\nedition = \"2021\"\n").unwrap();
+    let sub = dir.path().join("src");
+    std::fs::create_dir(&sub).unwrap();
+    std::fs::write(sub.join("lib.rs"), "pub fn f() {}\n").unwrap();
+    let output = cli()
+        .arg("review")
+        .arg(&sub)
+        .arg("--status")
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_review_with_all_project_rules() {
+    let fixture = fixture_path();
+    let output = cli()
+        .arg("review")
+        .arg(&fixture)
+        .arg("--rules")
+        .arg("missing-tests,dead-code,dep-graph,unused-variable")
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_review_reflect_with_json() {
+    let fixture = fixture_path();
+    let output = cli()
+        .arg("review")
+        .arg(&fixture)
+        .arg("--reflect")
+        .arg("--format")
+        .arg("json")
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let parsed: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert!(parsed.is_array());
+}
