@@ -44,6 +44,7 @@ fn list_detectors() -> Vec<Box<dyn Detector>> {
 fn all_rule_ids() -> Vec<&'static str> {
     let mut ids: Vec<&str> = list_detectors().iter().map(|d| d.rule_id()).collect();
     ids.push(qtcloud_code_cli::detect::unused_variable::RULE_ID);
+    ids.push(qtcloud_code_cli::detect::missing_tests::RULE_ID);
     ids
 }
 
@@ -69,9 +70,18 @@ fn run_review(path: &str, format: &str, cli_rules: Option<Vec<String>>, write_st
 
     let mut parsers = create_parsers()?;
     let mut all_findings: Vec<Finding> = Vec::new();
+    let mut source_files: Vec<PathBuf> = Vec::new();
 
     for entry in walkdir::WalkDir::new(&root).into_iter().filter_map(|e| e.ok()).filter(|e| e.file_type().is_file()) {
+        let path = entry.path().to_path_buf();
+        source_files.push(path.clone());
         scan_file(&entry, &mut parsers, &detectors, &mut all_findings);
+    }
+
+    if enabled_rules.contains(&qtcloud_code_cli::detect::missing_tests::RULE_ID.to_string()) {
+        let project_root = find_project_root(&root).unwrap_or_else(|| root.clone());
+        let test_findings = qtcloud_code_cli::detect::missing_tests::check_missing_tests(&project_root, &source_files);
+        all_findings.extend(test_findings);
     }
 
     if let Some(project_root) = find_project_root(&root) {
@@ -172,5 +182,6 @@ fn run_list_rules() -> Result<(), String> {
     }
     println!("\n可用检测规则（编译器级）:");
     println!("  {} — {}", qtcloud_code_cli::detect::unused_variable::RULE_ID, qtcloud_code_cli::detect::unused_variable::DESCRIPTION);
+    println!("  {} — {}", qtcloud_code_cli::detect::missing_tests::RULE_ID, qtcloud_code_cli::detect::missing_tests::DESCRIPTION);
     Ok(())
 }
