@@ -97,6 +97,61 @@ pub fn build_symbol_table(source: &str, tree: &tree_sitter::Tree, file: &Path) -
     SymbolTable { symbols }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rename_symbol() {
+        let sym = Symbol {
+            name: "foo".into(),
+            kind: SymbolKind::Function,
+            def_file: PathBuf::from("src/lib.rs"),
+            def_line: 5,
+            refs: vec![
+                RefLocation { file: PathBuf::from("src/main.rs"), line: 10 },
+            ],
+        };
+        let table = SymbolTable { symbols: vec![sym] };
+        let r = rename_symbol(&table, "foo", "bar");
+        assert_eq!(r.len(), 2);
+        assert_eq!(r.get("src/lib.rs:5").unwrap(), "bar");
+        assert_eq!(r.get("src/main.rs:10").unwrap(), "bar");
+    }
+
+    #[test]
+    fn test_rename_symbol_no_match() {
+        let table = SymbolTable { symbols: vec![] };
+        assert!(rename_symbol(&table, "foo", "bar").is_empty());
+    }
+
+    #[test]
+    fn test_build_symbol_table_basic() {
+        let code = "fn hello() {} fn main() { hello(); }";
+        let mut p = tree_sitter::Parser::new();
+        if p.set_language(&tree_sitter_rust::LANGUAGE.into()).is_err() { return; }
+        if let Some(tree) = p.parse(code, None) {
+            let table = build_symbol_table(code, &tree, Path::new("f.rs"));
+            assert!(table.symbols.iter().any(|s| s.name == "hello"), "should find hello");
+            assert!(table.symbols.iter().any(|s| s.name == "main"), "should find main");
+            let hello = table.symbols.iter().find(|s| s.name == "hello").unwrap();
+            assert_eq!(hello.refs.len(), 1, "hello should be called once");
+        }
+    }
+
+    #[test]
+    fn test_walk_all_terminates() {
+        let code = "fn a() { fn b() { fn c() {} } }";
+        let mut p = tree_sitter::Parser::new();
+        if p.set_language(&tree_sitter_rust::LANGUAGE.into()).is_err() { return; }
+        if let Some(tree) = p.parse(code, None) {
+            let mut count = 0;
+            walk_all(&tree.root_node(), &mut |_| { count += 1; });
+            assert!(count < 500, "walk_all count: {}", count);
+        }
+    }
+}
+
 /// 重命名符号：生成替换映射
 pub fn rename_symbol(table: &SymbolTable, old_name: &str, new_name: &str) -> HashMap<String, String> {
     let mut replacements = HashMap::new();

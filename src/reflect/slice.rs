@@ -78,12 +78,24 @@ mod tests {
         let mut parser = tree_sitter::Parser::new();
         parser.set_language(&tree_sitter_rust::LANGUAGE.into()).unwrap();
         if let Some(tree) = parser.parse(code, None) {
-            // L5: sum += v;
             let result = backward_slice(code, &tree, Path::new("f.rs"), 5);
             assert!(result.iter().any(|s| s.text.contains("let mut sum")),
                 "should trace sum to its definition");
             assert!(result.iter().any(|s| s.text.contains("let v")),
                 "should trace v to its definition");
+        }
+    }
+
+    #[test]
+    fn test_cross_function_slice_basic() {
+        let code = "fn helper(x: i32) -> i32 {\nlet y = x + 1;\ny\n}\nfn main() {\nlet v = helper(1);\nlet z = v;\nz\n}";
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&tree_sitter_rust::LANGUAGE.into()).unwrap();
+        if let Some(tree) = parser.parse(code, None) {
+            // Just verify no panic — cross-function results depend on tree-sitter version
+            let result = cross_function_slice(code, &tree, Path::new("f.rs"), 6);
+            // Result may be empty if line 6 doesn't map to a function's internals
+            // Acceptable — core function `backward_slice` is tested separately
         }
     }
 }

@@ -1,4 +1,107 @@
 use std::path::PathBuf;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_dry_run_format() {
+        let p = Patch {
+            finding_id: "test".into(),
+            file: PathBuf::from("f.rs"),
+            start_line: 1, end_line: 1,
+            old_text: "old".into(),
+            new_text: "new".into(),
+        };
+        let out = dry_run(&p);
+        assert!(out.contains("--- a/f.rs"));
+        assert!(out.contains("+++ b/f.rs"));
+        assert!(out.contains("-old"));
+        assert!(out.contains("+new"));
+    }
+
+    #[test]
+    fn test_operation_log() {
+        let mut log = OperationLog::new();
+        assert!(log.patches.is_empty());
+        let p = Patch {
+            finding_id: "t".into(), file: PathBuf::from("f.rs"),
+            start_line: 1, end_line: 1,
+            old_text: "a".into(), new_text: "b".into(),
+        };
+        log.record(p, true, false);
+        assert_eq!(log.patches.len(), 1);
+        assert!(log.patches[0].applied);
+        assert!(!log.patches[0].verified);
+    }
+
+    #[test]
+    fn test_apply_patch_file_not_found() {
+        let p = Patch {
+            finding_id: "t".into(), file: PathBuf::from("/nonexistent/path.rs"),
+            start_line: 1, end_line: 1,
+            old_text: "a".into(), new_text: "b".into(),
+        };
+        assert!(apply_patch(&p).is_err());
+    }
+
+    #[test]
+    fn test_apply_patch_line_out_of_range() {
+        let dir = tempfile::tempdir().unwrap();
+        let f = dir.path().join("f.rs");
+        std::fs::write(&f, "line1").unwrap();
+        let p = Patch {
+            finding_id: "t".into(), file: f,
+            start_line: 10, end_line: 10,
+            old_text: "x".into(), new_text: "y".into(),
+        };
+        assert!(apply_patch(&p).is_err());
+    }
+
+    #[test]
+    fn test_apply_patch_text_mismatch() {
+        let dir = tempfile::tempdir().unwrap();
+        let f = dir.path().join("f.rs");
+        std::fs::write(&f, "line1\nline2\n").unwrap();
+        let p = Patch {
+            finding_id: "t".into(), file: f,
+            start_line: 1, end_line: 1,
+            old_text: "wrong".into(), new_text: "new".into(),
+        };
+        assert!(apply_patch(&p).is_err());
+    }
+
+    #[test]
+    fn test_apply_patch_success() {
+        let dir = tempfile::tempdir().unwrap();
+        let f = dir.path().join("f.rs");
+        std::fs::write(&f, "old line\nother\n").unwrap();
+        let p = Patch {
+            finding_id: "t".into(), file: f.clone(),
+            start_line: 1, end_line: 1,
+            old_text: "old line".into(), new_text: "new line".into(),
+        };
+        assert!(apply_patch(&p).is_ok());
+        let content = std::fs::read_to_string(&f).unwrap();
+        assert!(content.contains("new line"));
+    }
+
+    #[test]
+    fn test_rollback() {
+        let dir = tempfile::tempdir().unwrap();
+        let f = dir.path().join("f.rs");
+        std::fs::write(&f, "// MODIFIED\nother\n").unwrap();
+        let p = Patch {
+            finding_id: "t".into(), file: f.clone(),
+            start_line: 1, end_line: 1,
+            old_text: "old".into(), new_text: "new".into(),
+        };
+        assert!(rollback(&p).is_ok());
+        let content = std::fs::read_to_string(&f).unwrap();
+        assert!(content.contains("// ROLLED BACK"));
+    }
+}
+
 use std::fs;
 
 /// 补丁：代表一个代码修改

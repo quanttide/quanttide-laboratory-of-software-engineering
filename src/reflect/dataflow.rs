@@ -62,6 +62,31 @@ mod tests {
     }
 
     #[test]
+    fn test_trace_variable_finds_decl() {
+        let code = "fn f() {\nlet x = 1;\nlet y = x;\ny\n}";
+        let mut p = tree_sitter::Parser::new();
+        if p.set_language(&tree_sitter_rust::LANGUAGE.into()).is_err() { return; }
+        if let Some(tree) = p.parse(code, None) {
+            let r = trace_variable(code, &tree, 3, "y");
+            assert!(!r.is_empty(), "should find y's declaration");
+            assert!(r.iter().any(|e| e.var == "y"), "should trace y");
+            // y depends on x, should also find x
+            assert!(r.iter().any(|e| e.var == "x"), "should trace x as upstream of y");
+        }
+    }
+
+    #[test]
+    fn test_trace_variable_unknown() {
+        let code = "fn f() { let x = 1; x }";
+        let mut p = tree_sitter::Parser::new();
+        if p.set_language(&tree_sitter_rust::LANGUAGE.into()).is_err() { return; }
+        if let Some(tree) = p.parse(code, None) {
+            let r = trace_variable(code, &tree, 1, "nonexistent");
+            assert!(r.is_empty(), "unknown var should return empty");
+        }
+    }
+
+    #[test]
     fn test_walk_all_terminates() {
         let mut parser = tree_sitter::Parser::new();
         parser.set_language(&tree_sitter_rust::LANGUAGE.into()).unwrap();

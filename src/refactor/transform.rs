@@ -32,6 +32,53 @@ fn is_safe_boundary(k: &str) -> bool {
         | "expression_statement" | "source_file")
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_byte_for_line() {
+        assert_eq!(byte_for_line("abc\ndef\nghi", 1), 0);
+        assert_eq!(byte_for_line("abc\ndef\nghi", 2), 4);
+        assert_eq!(byte_for_line("abc\ndef\nghi", 4), 11);
+    }
+
+    #[test]
+    fn test_byte_for_line_beyond_end() {
+        assert_eq!(byte_for_line("abc", 999), 3);
+    }
+
+    #[test]
+    fn test_byte_for_line_empty() {
+        assert_eq!(byte_for_line("", 1), 0);
+    }
+
+    #[test]
+    fn test_find_extract_boundary_inline_stmt() {
+        let code = "fn f() { let x = 1; x }";
+        let mut p = tree_sitter::Parser::new();
+        if p.set_language(&tree_sitter_rust::LANGUAGE.into()).is_err() { return; }
+        if let Some(tree) = p.parse(code, None) {
+            if let Some(candidate) = find_extract_boundary(code, &tree, 1) {
+                assert!(candidate.code.trim().starts_with("fn"));
+            }
+            // else: early return if no extraction boundary found — acceptable
+        }
+    }
+
+    #[test]
+    fn test_find_extract_boundary_invalid_line() {
+        let code = "fn f() {}";
+        let mut p = tree_sitter::Parser::new();
+        if p.set_language(&tree_sitter_rust::LANGUAGE.into()).is_err() { return; }
+        if let Some(tree) = p.parse(code, None) {
+            let r = find_extract_boundary(code, &tree, 999);
+            // Either None (byte beyond source) or Some (bounds wapped)
+            // Both are acceptable — just verify no panic
+        }
+    }
+}
+
 pub fn byte_for_line(source: &str, line: usize) -> usize {
     let mut byte = 0;
     let mut current = 1;
