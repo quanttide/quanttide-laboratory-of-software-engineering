@@ -267,7 +267,7 @@ fn collect_functions<'t>(root: &tree_sitter::Node<'t>, source: &str) -> Vec<(Str
     funcs
 }
 
-fn flatten_stmts<'t>(node: &tree_sitter::Node<'t>) -> Vec<tree_sitter::Node<'t>> {
+pub fn flatten_stmts<'t>(node: &tree_sitter::Node<'t>) -> Vec<tree_sitter::Node<'t>> {
     let mut stmts = Vec::new();
     recurse_stmt(node, &mut stmts);
     stmts
