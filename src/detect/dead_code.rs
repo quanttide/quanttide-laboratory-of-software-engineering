@@ -1,3 +1,40 @@
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse_rust(code: &str) -> Option<(String, tree_sitter::Tree)> {
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&tree_sitter_rust::LANGUAGE.into()).ok()?;
+        let tree = parser.parse(code, None)?;
+        Some((code.to_string(), tree))
+    }
+
+    #[test]
+    fn test_dead_code_detects_unused() {
+        if let Some((s, t)) = parse_rust("fn used() {} fn unused() {} fn main() { used(); }") {
+            let dead = check_dead_code(&s, &t);
+            assert_eq!(dead.len(), 1);
+            assert_eq!(dead[0].name, "unused");
+        }
+    }
+
+    #[test]
+    fn test_dead_code_empty() {
+        if let Some((s, t)) = parse_rust("") {
+            assert!(check_dead_code(&s, &t).is_empty());
+        }
+    }
+
+    #[test]
+    fn test_walk_all_terminates() {
+        if let Some((s, t)) = parse_rust("fn a() { fn b() {} }") {
+            let mut count = 0;
+            walk_all(&t.root_node(), &mut |_| count += 1);
+            assert!(count > 0 && count < 100);
+        }
+    }
+}
+
 fn walk_all<F: FnMut(tree_sitter::Node)>(node: &tree_sitter::Node, f: &mut F) {
     f(*node);
     let mut cursor = node.walk();

@@ -4,7 +4,7 @@ use std::process;
 
 use clap::{Parser, Subcommand};
 
-use qtcloud_code_cli::detect::{Detector, Finding};
+use qtcloud_code_cli::detect::{Detector, Finding, Severity};
 use qtcloud_code_cli::lang::LanguageParser;
 
 #[derive(Parser)]
@@ -100,7 +100,7 @@ fn run_review(path: &str, format: &str, cli_rules: Option<Vec<String>>, write_st
         all_findings.extend(compiler_findings);
     }
 
-    // 项目级扫描：依赖图 + 死代码
+    // 项目级扫描：死代码
     if enabled_rules.contains(&qtcloud_code_cli::detect::dead_code::RULE_ID.to_string()) {
         for file_path in &source_files {
             let ext = file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
@@ -112,12 +112,21 @@ fn run_review(path: &str, format: &str, cli_rules: Option<Vec<String>>, write_st
             let mut parser = tree_sitter::Parser::new();
             if parser.set_language(&tree_sitter_rust::LANGUAGE.into()).is_err() { continue; }
             if let Some(tree) = parser.parse(&source, None) {
-                let dead = qtcloud_code_cli::detect::dead_code::check_dead_code(&source, &tree);
-                for func in &dead {
-                    println!("  ├─ 死代码: {}:L{} `{}` 未被调用", file_path.display(), func.line, func.name);
+                for func in qtcloud_code_cli::detect::dead_code::check_dead_code(&source, &tree) {
+                    all_findings.push(Finding {
+                        file_path: file_path.clone(),
+                        line: func.line,
+                        column: 1,
+                        severity: qtcloud_code_cli::detect::Severity::May,
+                        rule_id: qtcloud_code_cli::detect::dead_code::RULE_ID.to_string(),
+                        message: format!("函数 `{}` 未被调用", func.name),
+                    });
                 }
             }
         }
+    }
+    // 项目级扫描：依赖图
+    if enabled_rules.contains(&qtcloud_code_cli::detect::depgraph::RULE_ID.to_string()) {
         let dep = qtcloud_code_cli::detect::depgraph::build_dep_graph(&root);
         all_findings.extend(qtcloud_code_cli::detect::depgraph::check(&dep));
     }

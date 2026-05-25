@@ -46,6 +46,33 @@ pub fn trace_variable(
     path
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_trace_variable_empty() {
+        // 空源码不应 panic
+        let mut parser = tree_sitter::Parser::new();
+        if parser.set_language(&tree_sitter_rust::LANGUAGE.into()).is_err() { return; }
+        if let Some(tree) = parser.parse("", None) {
+            let r = trace_variable("", &tree, 1, "x");
+            assert!(r.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_walk_all_terminates() {
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&tree_sitter_rust::LANGUAGE.into()).unwrap();
+        if let Some(tree) = parser.parse("fn f() { let x = 1; }", None) {
+            let mut count = 0;
+            walk_all(&tree.root_node(), &mut |_| count += 1);
+            assert!(count > 0 && count < 200, "walk_all count: {}", count);
+        }
+    }
+}
+
 fn walk_all<F: FnMut(tree_sitter::Node)>(node: &tree_sitter::Node, f: &mut F) {
     f(*node);
     let mut cursor = node.walk();

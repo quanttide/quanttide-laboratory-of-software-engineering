@@ -2,6 +2,62 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use crate::reflect::SliceEntry;
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_walk_all_terminates() {
+        // 验证 walk_all 在各种树结构上都能终止（不会无限循环）
+        let cases = ["fn a() {}", "fn b() { fn c() {} }", "", "mod x; use y;"];
+        for code in &cases {
+            let mut parser = tree_sitter::Parser::new();
+            if parser.set_language(&tree_sitter_rust::LANGUAGE.into()).is_err() { continue; }
+            if let Some(tree) = parser.parse(code, None) {
+                let root = tree.root_node();
+                let mut count = 0;
+                walk_all(&root, &mut |_| count += 1);
+                assert!(count > 0, "walk_all should visit at least root node");
+                assert!(count < 1000, "walk_all should not loop infinitely (visited {})", count);
+            }
+        }
+    }
+
+    #[test]
+    fn test_backward_slice_empty_input() {
+        // 空源码和空树不应 panic
+        let mut parser = tree_sitter::Parser::new();
+        if parser.set_language(&tree_sitter_rust::LANGUAGE.into()).is_err() { return; }
+        if let Some(tree) = parser.parse("", None) {
+            let result = backward_slice("", &tree, Path::new("f.rs"), 1);
+            assert!(result.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_backward_slice_out_of_range_line() {
+        let code = "fn f() { let x = 1; x }";
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&tree_sitter_rust::LANGUAGE.into()).unwrap();
+        if let Some(tree) = parser.parse(code, None) {
+            let result = backward_slice(code, &tree, Path::new("f.rs"), 999);
+            assert!(result.is_empty(), "out-of-range line should return empty");
+        }
+    }
+
+    #[test]
+    fn test_backward_slice_basic() {
+        let code = "fn f() { let x = 1; let y = x + 1; y }";
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&tree_sitter_rust::LANGUAGE.into()).unwrap();
+        if let Some(tree) = parser.parse(code, None) {
+            let result = backward_slice(code, &tree, Path::new("f.rs"), 1);
+            // L1 has 3 statements, should find at least the statement at L1
+            assert!(!result.is_empty(), "should find at least the target line");
+        }
+    }
+}
+
 fn walk_all<F: FnMut(tree_sitter::Node)>(node: &tree_sitter::Node, f: &mut F) {
     f(*node);
     let mut cursor = node.walk();

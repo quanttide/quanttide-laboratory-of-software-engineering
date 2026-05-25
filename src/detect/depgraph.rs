@@ -1,4 +1,66 @@
 use std::collections::HashSet;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_empty_graph_no_findings() {
+        let g = DepGraph { nodes: vec![], edges: vec![] };
+        assert!(check(&g).is_empty());
+    }
+
+    #[test]
+    fn test_cycle_detection() {
+        let g = DepGraph {
+            nodes: vec!["a".into(), "b".into()],
+            edges: vec![("a".into(), "b".into()), ("b".into(), "a".into())],
+        };
+        let f = check(&g);
+        assert!(f.iter().any(|x| x.message.contains("循环依赖")));
+    }
+
+    #[test]
+    fn test_orphan_detection() {
+        let g = DepGraph {
+            nodes: vec!["a".into(), "b".into()],
+            edges: vec![("a".into(), "b".into())],
+        };
+        let f = check(&g);
+        // a 依赖 b, a 不孤立; b 被 a 依赖, 不孤立
+        assert!(!f.iter().any(|x| x.message.contains("孤立")));
+    }
+
+    #[test]
+    fn test_high_fan_in() {
+        let nodes: Vec<String> = (0..8).map(|i| format!("m{}", i)).collect();
+        let edges: Vec<(String, String)> = (1..8).map(|i| (format!("m{}", i), "m0".into())).collect();
+        let g = DepGraph { nodes, edges };
+        let f = check(&g);
+        assert!(f.iter().any(|x| x.message.contains("高扇入")));
+    }
+
+    #[test]
+    fn test_high_fan_out() {
+        let nodes: Vec<String> = (0..8).map(|i| format!("m{}", i)).collect();
+        let edges: Vec<(String, String)> = (1..8).map(|i| ("m0".into(), format!("m{}", i))).collect();
+        let g = DepGraph { nodes, edges };
+        let f = check(&g);
+        assert!(f.iter().any(|x| x.message.contains("高扇出")));
+    }
+
+    #[test]
+    fn test_reverse_dep_slice() {
+        let g = DepGraph {
+            nodes: vec!["a".into(), "b".into(), "c".into()],
+            edges: vec![("a".into(), "c".into()), ("b".into(), "c".into())],
+        };
+        let r = reverse_dep_slice(&g, "c");
+        assert_eq!(r.len(), 2);
+        assert!(r.contains(&"a".to_string()));
+        assert!(r.contains(&"b".to_string()));
+    }
+}
 use std::path::{Path, PathBuf};
 use std::fs;
 
@@ -161,7 +223,7 @@ fn file_to_module_path(file: &Path, root: &Path) -> String {
 
 pub fn check(graph: &DepGraph) -> Vec<Finding> {
     let mut findings = Vec::new();
-    let file = PathBuf::from("src/");
+    let file = PathBuf::from(".");
 
     // 1. 循环依赖检测
     for (from, to) in &graph.edges {
