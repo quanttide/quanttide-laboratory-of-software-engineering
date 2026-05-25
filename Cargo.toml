@@ -23,6 +23,10 @@ path = "src/bin/dep_exp.rs"
 name = "evidence-exp"
 path = "src/bin/evidence_exp.rs"
 
+[[bin]]
+name = "ast-refactor-exp"
+path = "src/bin/ast_refactor_exp.rs"
+
 [[test]]
 name = "review"
 path = "tests/review.rs"
