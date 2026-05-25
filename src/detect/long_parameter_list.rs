@@ -192,4 +192,36 @@ mod tests {
         assert_eq!(classify(9), Some(Severity::Should));
         assert_eq!(classify(10), Some(Severity::Must));
     }
+
+    #[test]
+    fn test_python_many_params() {
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&tree_sitter_python::LANGUAGE.into()).unwrap();
+        let source = "def f(a, b, c, d, e, f, g): pass";
+        let tree = parser.parse(source, None).unwrap();
+        let findings = LongParameterListDetector.detect(source, &tree, &PathBuf::from("f.py"));
+        assert!(!findings.is_empty());
+        assert_eq!(findings[0].severity, Severity::Should);
+    }
+
+    #[test]
+    fn test_go_many_params() {
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&tree_sitter_go::LANGUAGE.into()).unwrap();
+        let source = "package main\nfunc f(a, b, c, d, e, f, g int) {}";
+        let tree = parser.parse(source, None).unwrap();
+        let findings = LongParameterListDetector.detect(source, &tree, &PathBuf::from("f.go"));
+        assert!(!findings.is_empty());
+        assert_eq!(findings[0].severity, Severity::Should);
+    }
+
+    #[test]
+    fn test_go_few_params_shared_type() {
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&tree_sitter_go::LANGUAGE.into()).unwrap();
+        let source = "package main\nfunc f(a, b int) {}";
+        let tree = parser.parse(source, None).unwrap();
+        let findings = LongParameterListDetector.detect(source, &tree, &PathBuf::from("f.go"));
+        assert!(findings.is_empty());
+    }
 }
