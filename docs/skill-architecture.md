@@ -51,13 +51,23 @@ Skill = prompt + 工具调用指令 + 元数据，注册为 `.agents/skills/<nam
 
 ## 候选 Skill
 
-| Skill | 工具组合 | 输入 | 输出 |
-|-------|----------|------|------|
-| `analyse-security` | backward_slice + dataflow | 文件 + 行号 | 安全检查报告 |
-| `analyse-duplicate` | flatten_stmts | 函数节点 | 重复模式报告 |
-| `analyse-consistency` | dataflow × N | 多变量路径 | 一致性检查报告 |
-| `analyse-boundary` | flatten_stmts | 过长函数 | 职责拆分建议 |
-| `analyse-impact` | forward_slice + call_graph | 定义行 | 变更影响范围 |
+Skill 只预设**工具调用**（如何收集证据），不预设**分析维度**（看什么），让 LLM 自主发现。
+
+| Skill | 工具集 | 输入 | 说明 |
+|-------|--------|------|------|
+| `analyse-line` | backward_slice + dataflow + forward_slice | 文件 + 行号 | 给证据，让 LLM 自己发现是安全问题还是重复还是别的 |
+| `analyse-function` | flatten_stmts + call_graph + type_info | 函数名 | 同上 |
+
+单一 skill，不按分析维度拆分。`parts[2]` 的越界 bug 证明了 LLM 在充足的证据下能自己发现问题，不需要预设「你要检查安全性」。
+
+## 质量问题
+
+reflect 的 D 级输出和 A 级输出在语气上几乎不可区分。LLM 说"职责不够单一"和"缺少长度检查会导致 panic"听起来一样自信，但前者空洞、后者精确。
+
+防御机制：
+1. **验证闭环** — reflect 的输出必须能转化为具体的 refactor 动作，否则应标记为低置信度
+2. **证据锚定** — reflect 输出中引用行号/变量名的比例 > 50% 才算合格
+3. **人类审核** — 允许用户 dismiss 空洞的 reflect 输出
 
 ## 参考实现
 
