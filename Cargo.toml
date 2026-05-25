@@ -7,6 +7,14 @@ authors = ["Guo-Zhang <zhangguo@quanttide.com>"]
 license = "MIT"
 repository = "https://github.com/quanttide/quanttide-laboratory-of-software-engineering"
 
+[[bin]]
+name = "qtcloud-code"
+path = "src/main.rs"
+
+[[test]]
+name = "scan"
+path = "tests/scan.rs"
+
 [dependencies]
 clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
