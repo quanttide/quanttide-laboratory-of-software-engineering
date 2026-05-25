@@ -59,8 +59,8 @@ fn all_rule_ids() -> Vec<&'static str> {
 fn main() {
     let cli = Cli::parse();
     let result = match cli.command {
-        Commands::Review { path, format, rules, status, reflect, refactor } => {
-            run_review(&path, &format, rules, status, reflect, refactor)
+        Commands::Review { path, format, rules, status, reflect, refactor: _ } => {
+            run_review(&path, &format, rules, status, reflect)
         }
         Commands::ListRules => run_list_rules(),
     };
@@ -71,7 +71,7 @@ fn main() {
     }
 }
 
-fn run_review(path: &str, format: &str, cli_rules: Option<Vec<String>>, write_status: bool, enable_reflect: bool, enable_refactor: bool) -> Result<(), String> {
+fn run_review(path: &str, format: &str, cli_rules: Option<Vec<String>>, write_status: bool, enable_reflect: bool) -> Result<(), String> {
     let root = resolve_root(path)?;
     let config = qtcloud_code_cli::config::load_contract(&root);
     let enabled_rules = qtcloud_code_cli::config::resolve_enabled_rules(&cli_rules, &config, &all_rule_ids());
