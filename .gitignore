@@ -1,11 +1,2 @@
-__pycache__/
-*.pyc
-*.pyo
-.venv/
-venv/
-.env
-.mypy_cache/
-.pytest_cache/
-*.egg-info/
-dist/
-build/
+/target/
+**/*.rs.bk
