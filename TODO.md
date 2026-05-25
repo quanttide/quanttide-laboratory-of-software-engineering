@@ -1,29 +1,60 @@
-# TODO — qtcloud-code-cli
+# TODO — qtcloud-code-cli（实验室）
 
 ## P0 已完成 ✅
 
-- [x] CLI 命令框架（`scan` / `list-rules`）
-- [x] tree-sitter-rust 集成，Rust 代码解析
-- [x] 递归扫描目录下所有 `.rs` 文件
-- [x] 检测器：过长函数（>30 行）
-- [x] 检测器：宽泛 unsafe 块（>5 条语句）
-- [x] 输出格式：JSON（`--format json`）和终端文本
-- [x] 错误处理：解析失败、权限拒绝时跳过
-- [x] 集成测试：使用 `examples/default` 作为 fixture
+- [x] CLI 框架（`review` / `list-rules`）
+- [x] tree-sitter 多语言集成（Rust / Python / Go / Dart / TypeScript）
+- [x] 检测器：过长函数、unsafe 块、过长参数列表、未使用变量、缺失测试
+- [x] 输出格式：终端 / JSON / STATUS.md
+- [x] 配置系统：`.quanttide/code/contract.yaml` + `--rules`
+- [x] 自举验证 + 77 测试 + 95% 覆盖率
+- [x] 发布流水线：`cli/v*` tag → crates.io
 
-## 高优
+## P1 — Reflect 规则引擎
 
-- [x] 检测器：未使用变量（走 rustc 路径，运行 `cargo check --message-format=json` 解析）
-- [x] file_path 输出改为绝对路径（入口处 canonicalize）
-- [x] 多语言：`LanguageParser` trait 提取后，加 Python 支持
+### 程序切片
 
-## 中优
+- [ ] 验证 tree-sitter 能否提取控制流信息
+- [ ] 实现单函数反向切片：给定位置 + 变量，找出影响该点的语句集合
+- [ ] 实现跨函数反向切片：沿调用链追溯
+- [ ] 切片输出格式化：语句集合 + 行号范围
 
-- [x] tree-sitter-go 绑定（含 `function_declaration` / `method_declaration` 节点支持）
-- [x] tree-sitter-dart 绑定（`function_signature` 嵌套结构处理）
-- [x] tree-sitter-typescript 绑定（含 `.ts` / `.tsx` 双解析器）
-- [x] 通用检测器：过长函数（跨语言，同时支持 Rust `function_item` 和 Python `function_definition`）
-- [x] 通用检测器：过长参数列表（跨语言，使用 `child_by_field_name("parameters")`）
-- [x] `--rules` 选择启用的检测器（`--rules long-function,long-parameter-list`）
-- [x] `.quanttide/code/contract.yaml` 配置文件（从扫描目录向上查找，支持 `code.rules` 字段）
+### 数据流分析
 
+- [ ] 实现变量级数据流追踪：定义→使用路径
+- [ ] 实现跨函数数据流追踪：参数传递、返回值
+- [ ] 数据流图输出：值传递路径
+
+### 依赖图分析
+
+- [ ] 构建项目模块依赖图（基于 import/use/mod 声明）
+- [ ] 实现反向依赖切片：找出依赖某个模块的所有调用链
+- [ ] 实现正向依赖切片：找出某个模块影响的所有下游
+
+### 证据链
+
+- [ ] 合并三种分析结果为统一的 `EvidenceChain` 结构
+- [ ] 证据链 JSON 输出
+- [ ] `--reflect` 标志接入
+
+## P2 — Refactor 规则引擎
+
+### AST 变换基础设施
+
+- [ ] 代码块 AST 边界识别与选择
+- [ ] 符号表构建：符号定义→所有引用映射
+
+### 机械变换
+
+- [ ] 函数提取：选择代码块 → 创建新函数 → 替换调用点
+- [ ] 符号重命名：更新所有引用
+- [ ] 内联变量/函数：展开 → 删除原定义
+- [ ] 死代码删除：检测未使用声明 → 移除
+
+### 安全机制
+
+- [ ] dry-run 模式（输出 diff 不写文件）
+- [ ] `--apply` 确认写入
+- [ ] 编译 + 测试自动验证
+- [ ] 验证失败回退
+- [ ] 操作日志记录
