@@ -23,64 +23,42 @@ pub fn check_compiler(project_root: &Path, enabled_rules: &[String]) -> Result<V
     let mut findings = Vec::new();
 
     for line in stdout.lines() {
-        if !line.starts_with('{') {
-            continue;
+        if let Some(finding) = parse_compiler_message(line, project_root) {
+            findings.push(finding);
         }
-
-        let Ok(msg) = serde_json::from_str::<serde_json::Value>(line) else {
-            continue;
-        };
-
-        if msg["reason"] != "compiler-message" {
-            continue;
-        }
-        if msg["message"]["level"] != "warning" {
-            continue;
-        }
-
-        let code = match msg["message"]["code"]["code"].as_str() {
-            Some(c) => c,
-            None => continue,
-        };
-        if !WARNING_CODES.contains(&code) {
-            continue;
-        }
-
-        let spans = match msg["message"]["spans"].as_array() {
-            Some(s) => s,
-            None => continue,
-        };
-        let Some(span) = spans.first() else { continue };
-
-        let file_name = match span["file_name"].as_str() {
-            Some(f) => f,
-            None => continue,
-        };
-        let line = match span["line_start"].as_u64() {
-            Some(l) => l as usize,
-            None => continue,
-        };
-        let column = match span["column_start"].as_u64() {
-            Some(c) => c as usize,
-            None => 1,
-        };
-
-        let msg_text = match msg["message"]["message"].as_str() {
-            Some(m) => m.to_string(),
-            None => continue,
-        };
-
-        let file_path = project_root.join(file_name);
-
-        findings.push(Finding {
-            file_path,
-            line,
-            column,
-            severity: Severity::Should,
-            rule_id: RULE_ID.to_string(),
-            message: msg_text,
-        });
     }
 
     Ok(findings)
+}
+
+fn parse_compiler_message(line: &str, project_root: &Path) -> Option<Finding> {
+    if !line.starts_with('{') {
+        return None;
+    }
+
+    let msg = serde_json::from_str::<serde_json::Value>(line).ok()?;
+
+    if msg["reason"] != "compiler-message" || msg["message"]["level"] != "warning" {
+        return None;
+    }
+
+    let code = msg["message"]["code"]["code"].as_str()?;
+    if !WARNING_CODES.contains(&code) {
+        return None;
+    }
+
+    let span = msg["message"]["spans"].as_array()?.first()?;
+    let file_name = span["file_name"].as_str()?;
+    let line = span["line_start"].as_u64()? as usize;
+    let column = span["column_start"].as_u64().unwrap_or(1) as usize;
+    let msg_text = msg["message"]["message"].as_str()?.to_string();
+
+    Some(Finding {
+        file_path: project_root.join(file_name),
+        line,
+        column,
+        severity: Severity::Should,
+        rule_id: RULE_ID.to_string(),
+        message: msg_text,
+    })
 }

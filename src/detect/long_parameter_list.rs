@@ -21,10 +21,7 @@ impl Detector for LongParameterListDetector {
 
     fn detect(&self, source: &str, tree: &tree_sitter::Tree, file_path: &PathBuf) -> Vec<Finding> {
         let mut findings = Vec::new();
-        let mut cursor = tree.walk();
-
-        loop {
-            let node = cursor.node();
+        super::walk_tree(tree, |node| {
             if FUNCTION_NODE_KINDS.contains(&node.kind()) {
                 let param_count = find_parameters_node(&node)
                     .as_ref().map(|p| count_params(p))
@@ -42,19 +39,8 @@ impl Detector for LongParameterListDetector {
                     });
                 }
             }
-
-            if cursor.goto_first_child() {
-                continue;
-            }
-            loop {
-                if cursor.goto_next_sibling() {
-                    break;
-                }
-                if !cursor.goto_parent() {
-                    return findings;
-                }
-            }
-        }
+        });
+        findings
     }
 }
 

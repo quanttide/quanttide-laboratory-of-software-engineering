@@ -4,6 +4,12 @@ use std::time::SystemTime;
 
 use crate::detect::{Finding, Severity};
 
+macro_rules! writeln_err {
+    ($dst:expr $(, $arg:expr)* $(,)?) => {
+        writeln!($dst $(, $arg)*).map_err(|e| e.to_string())
+    };
+}
+
 pub fn write_json<W: Write>(writer: &mut W, findings: &[Finding]) -> Result<(), String> {
     let output: Vec<serde_json::Value> = findings
         .iter()
@@ -19,12 +25,12 @@ pub fn write_json<W: Write>(writer: &mut W, findings: &[Finding]) -> Result<(), 
         })
         .collect();
     let json = serde_json::to_string_pretty(&output).map_err(|e| e.to_string())?;
-    writeln!(writer, "{}", json).map_err(|e| e.to_string())
+    writeln_err!(writer, "{}", json)
 }
 
 pub fn write_terminal<W: Write>(writer: &mut W, findings: &[Finding]) -> Result<(), String> {
     if findings.is_empty() {
-        writeln!(writer, "未发现问题").map_err(|e| e.to_string())?;
+        writeln_err!(writer, "未发现问题")?;
         return Ok(());
     }
 
@@ -34,12 +40,11 @@ pub fn write_terminal<W: Write>(writer: &mut W, findings: &[Finding]) -> Result<
             Severity::Should => ("🟡", "SHOULD"),
             Severity::May => ("🔵", "MAY"),
         };
-        writeln!(
+        writeln_err!(
             writer,
             "{} [{}] {}:{}  {}  {}",
             icon, tag, f.file_path.display(), f.line, f.rule_id, f.message
-        )
-        .map_err(|e| e.to_string())?;
+        )?;
     }
     Ok(())
 }
@@ -50,32 +55,41 @@ pub fn write_status<W: Write>(writer: &mut W, findings: &[Finding]) -> Result<()
         .unwrap_or_default()
         .as_secs();
 
+    writeln_err!(writer, "# Code Scan Status")?;
+    writeln_err!(writer)?;
+    writeln_err!(writer, "> 自动生成于 qtcloud-code review，时间戳: {}", timestamp)?;
+    writeln_err!(writer)?;
+
+    write_status_summary(writer, findings)?;
+
+    if findings.is_empty() {
+        writeln_err!(writer, "✅ 未发现问题")?;
+        return Ok(());
+    }
+
+    write_status_details(writer, findings)
+}
+
+fn write_status_summary<W: Write>(writer: &mut W, findings: &[Finding]) -> Result<(), String> {
     let total = findings.len();
     let must = findings.iter().filter(|f| f.severity == Severity::Must).count();
     let should = findings.iter().filter(|f| f.severity == Severity::Should).count();
     let may = findings.iter().filter(|f| f.severity == Severity::May).count();
 
-    writeln!(writer, "# Code Scan Status").map_err(|e| e.to_string())?;
-    writeln!(writer).map_err(|e| e.to_string())?;
-    writeln!(writer, "> 自动生成于 qtcloud-code review，时间戳: {}", timestamp).map_err(|e| e.to_string())?;
-    writeln!(writer).map_err(|e| e.to_string())?;
-    writeln!(writer, "## 汇总").map_err(|e| e.to_string())?;
-    writeln!(writer).map_err(|e| e.to_string())?;
-    writeln!(writer, "| 级别 | 数量 |").map_err(|e| e.to_string())?;
-    writeln!(writer, "|------|------|").map_err(|e| e.to_string())?;
-    writeln!(writer, "| MUST   | {} |", must).map_err(|e| e.to_string())?;
-    writeln!(writer, "| SHOULD | {} |", should).map_err(|e| e.to_string())?;
-    writeln!(writer, "| MAY    | {} |", may).map_err(|e| e.to_string())?;
-    writeln!(writer, "| **Total** | **{}** |", total).map_err(|e| e.to_string())?;
-    writeln!(writer).map_err(|e| e.to_string())?;
+    writeln_err!(writer, "## 汇总")?;
+    writeln_err!(writer)?;
+    writeln_err!(writer, "| 级别 | 数量 |")?;
+    writeln_err!(writer, "|------|------|")?;
+    writeln_err!(writer, "| MUST   | {} |", must)?;
+    writeln_err!(writer, "| SHOULD | {} |", should)?;
+    writeln_err!(writer, "| MAY    | {} |", may)?;
+    writeln_err!(writer, "| **Total** | **{}** |", total)?;
+    writeln_err!(writer)
+}
 
-    if findings.is_empty() {
-        writeln!(writer, "✅ 未发现问题").map_err(|e| e.to_string())?;
-        return Ok(());
-    }
-
-    writeln!(writer, "## 详情").map_err(|e| e.to_string())?;
-    writeln!(writer).map_err(|e| e.to_string())?;
+fn write_status_details<W: Write>(writer: &mut W, findings: &[Finding]) -> Result<(), String> {
+    writeln_err!(writer, "## 详情")?;
+    writeln_err!(writer)?;
 
     let mut by_file: BTreeMap<String, Vec<&Finding>> = BTreeMap::new();
     for f in findings {
@@ -84,15 +98,14 @@ pub fn write_status<W: Write>(writer: &mut W, findings: &[Finding]) -> Result<()
     }
 
     for (file, findings) in &by_file {
-        writeln!(writer, "- **{}** ({} 项)", file, findings.len()).map_err(|e| e.to_string())?;
+        writeln_err!(writer, "- **{}** ({} 项)", file, findings.len())?;
         for f in findings {
             let (icon, tag) = match f.severity {
                 Severity::Must => ("🔴", "MUST"),
                 Severity::Should => ("🟡", "SHOULD"),
                 Severity::May => ("🔵", "MAY"),
             };
-            writeln!(writer, "  - {} **{}** `{}` {}:{} — {}", icon, tag, f.rule_id, f.line, f.column, f.message)
-                .map_err(|e| e.to_string())?;
+            writeln_err!(writer, "  - {} **{}** `{}` {}:{} — {}", icon, tag, f.rule_id, f.line, f.column, f.message)?;
         }
     }
 

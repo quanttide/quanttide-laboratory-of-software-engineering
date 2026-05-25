@@ -19,10 +19,7 @@ impl Detector for UnsafeBlockDetector {
 
     fn detect(&self, _source: &str, tree: &tree_sitter::Tree, file_path: &PathBuf) -> Vec<Finding> {
         let mut findings = Vec::new();
-        let mut cursor = tree.walk();
-
-        loop {
-            let node = cursor.node();
+        super::walk_tree(tree, |node| {
             if node.kind() == "unsafe_block" {
                 let stmt_count = count_block_statements(&node);
                 if let Some(severity) = classify(stmt_count) {
@@ -37,19 +34,8 @@ impl Detector for UnsafeBlockDetector {
                     });
                 }
             }
-
-            if cursor.goto_first_child() {
-                continue;
-            }
-            loop {
-                if cursor.goto_next_sibling() {
-                    break;
-                }
-                if !cursor.goto_parent() {
-                    return findings;
-                }
-            }
-        }
+        });
+        findings
     }
 }
 

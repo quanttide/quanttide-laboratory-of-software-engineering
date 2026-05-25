@@ -23,6 +23,24 @@ pub trait Detector {
     fn detect(&self, source: &str, tree: &tree_sitter::Tree, file_path: &PathBuf) -> Vec<Finding>;
 }
 
+pub fn walk_tree<F: FnMut(tree_sitter::Node)>(tree: &tree_sitter::Tree, mut f: F) {
+    let mut cursor = tree.walk();
+    loop {
+        f(cursor.node());
+        if cursor.goto_first_child() {
+            continue;
+        }
+        loop {
+            if cursor.goto_next_sibling() {
+                break;
+            }
+            if !cursor.goto_parent() {
+                return;
+            }
+        }
+    }
+}
+
 pub mod long_function;
 pub mod long_parameter_list;
 pub mod unsafe_block;
