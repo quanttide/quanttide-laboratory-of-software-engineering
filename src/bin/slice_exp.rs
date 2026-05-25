@@ -53,12 +53,19 @@ fn process(items: &[i32], threshold: i32) -> i32 {
     }
 
     // 跨函数反向切片
-    let finding_line = 12; // sum += v
-    println!("\n=== 跨函数反向切片：L{} ===", finding_line);
+    let finding_line = 12;
+    println!("\n=== 反向切片：从 L{} 'sum += v' 追溯 ===", finding_line);
     let result = cross_function_slice(&functions, &func_decls, &func_stmts, code, &"process".to_string(), finding_line);
     for (i, (func, l, text)) in result.iter().enumerate() {
         let short = if text.len() > 60 { format!("{}...", &text[..57]) } else { text.to_string() };
         println!("  {}. {}:L{} {}", i + 1, func, l, short);
+    }
+
+    // 数据流分析：v → helper(*item) → y = x + 1 → x (参数)
+    println!("\n=== 数据流路径：v ===");
+    let dataflow = dataflow_path(&functions, &func_decls, &func_stmts, code, "process", 12, "v");
+    for (i, (func, l, var, text)) in dataflow.iter().enumerate() {
+        println!("  {}. {}:L{} {} ── {}", i + 1, func, l, var, text);
     }
 }
 
@@ -265,6 +272,63 @@ fn extract_identifiers(node: &tree_sitter::Node, source: &[u8]) -> Vec<String> {
             if !cursor.goto_parent() { return names; }
         }
     }
+}
+
+// ===== 数据流路径 =====
+
+fn dataflow_path(
+    _functions: &HashMap<String, tree_sitter::Node>,
+    func_decls: &HashMap<String, HashMap<String, usize>>,
+    func_stmts: &HashMap<String, Vec<tree_sitter::Node>>,
+    source: &str,
+    start_func: &str,
+    start_line: usize,
+    var: &str,
+) -> Vec<(String, usize, String, String)> {
+    let mut path = Vec::new();
+    let mut visited = std::collections::HashSet::new();
+    let mut stack = vec![(start_func.to_string(), start_line, var.to_string())];
+
+    while let Some((func_name, _line, current_var)) = stack.pop() {
+        if !visited.insert(current_var.clone()) { continue; }
+
+        let decl_line = match func_decls.get(&func_name).and_then(|d| d.get(&current_var)) {
+            Some(&l) => l,
+            None => continue, // 参数或无声明变量
+        };
+
+        let stmt = match func_stmts.get(&func_name)
+            .and_then(|s| s.iter().find(|st| st.start_position().row + 1 == decl_line))
+        {
+            Some(s) if s.kind() == "let_declaration" => s,
+            _ => continue,
+        };
+
+        let text = stmt.utf8_text(source.as_bytes()).unwrap_or("?").to_string();
+        let short = if text.len() > 60 { format!("{}...", &text[..57]) } else { text };
+        path.push((func_name.clone(), decl_line, current_var.clone(), short));
+
+        // 从 RHS 文本中提取 identifier（跨函数调用时追踪被调用函数的参数）
+        if let Ok(full_text) = stmt.utf8_text(source.as_bytes()) {
+            // 从 `= <expr>;` 部分提取变量名
+            if let Some(eq_pos) = full_text.find('=') {
+                let rhs = &full_text[eq_pos + 1..].trim_end_matches(';').trim();
+                // 检查是否是函数调用 `helper(*item)` - 提取函数名
+                if let Some(paren) = rhs.find('(') {
+                    let callee = rhs[..paren].trim();
+                    stack.push((callee.to_string(), 0, "param".to_string()));
+                }
+                // 提取 rhs 中的简单 identifier
+                for word in rhs.split(|c: char| !c.is_alphanumeric() && c != '_') {
+                    if !word.is_empty() && word != &current_var && word.chars().all(|c| c.is_alphanumeric() || c == '_') {
+                        stack.push((func_name.clone(), 0, word.to_string()));
+                    }
+                }
+            }
+        }
+    }
+
+    path
 }
 
 fn find_callee_in_stmt(stmt: &tree_sitter::Node, source: &str) -> Option<String> {
