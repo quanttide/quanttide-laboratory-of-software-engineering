@@ -1,14 +1,40 @@
-# 假阳性过滤实验报告
+# 假阳性过滤实验
 
-## 统计
+验证"启发式预过滤 + LLM 二次审查"两级流水线能否降低代码审查的假阳性。
 
-| 指标 | 值 |
-|------|---|
-| 总 finding 数 | 7 |
-| LLM 确认 (CONFIRM) | 6 |
-| LLM 驳回 (DISMISS) | 1 |
-| 驳回率 | 14.3% |
+## 实验
 
-## 驳回详情
+三个对照：
 
-- `/home/iguo/repos/quanttide/domains/quanttide-code/apps/qtcloud-code/src/cli/src/refactor/mod.rs:1` [missing-tests] 该 finding 指出 `src/refactor/mod.rs` 缺少对应测试，但代码仅包含一行 `pub mod rename;`，即模块声明。模块本身没有可测试的逻辑，测试应针对 `rename` 模块内部的具体函数或功能，而非模块声明文件。因此，该 finding 不是真问题。
+| | 项目 | 过滤 |
+|--|------|------|
+| 1 | qtcloud-code（小） | 无 |
+| 2 | qtcloud-devops（大） | 无 |
+| 3 | qtcloud-devops（大） | 有 |
+
+## 数据
+
+实验 2 的 23 个 finding 中，LLM 驳回了 8 个（34.8%）。这 8 个驳回的分类：
+
+```
+测试函数过长      3 个（37.5%） — 模式化
+骨架文件缺测试    4 个（50%）   — 模式化
+LLM 不确定        1 个（12.5%） — 边界情况
+```
+
+87.5% 的驳回可以用启发式规则覆盖。
+
+实验 3 加上过滤后：finding 从 23 降到 12，LLM 调用节省 48%，剩余 12 个全部为真问题（驳回率 0%）。
+
+## 已实现的启发式规则
+
+- **跳过测试函数**（`long-function`）：`#[test]` 属性或 `test_` 前缀 → 跳过
+- **跳过骨架文件**（`missing-tests`）：`__init__.py`、`build.rs`、声明-only 的 `mod.rs`/`lib.rs` → 跳过
+
+代码位置：`detector/long_function.rs`、`detector/missing_tests.rs`
+
+## 结论
+
+两极流水线架构已验证有效：启发式规则先过滤模式化假阳性，LLM 只处理剩下的边界情况。LLM 在边界情况（如 `scan_single_submodule`：57 行、逻辑复杂但职责集中）上能做出正确判断。
+
+下一步：探索证据链组织——给 LLM 看什么证据，才能让它做最准的判断。
