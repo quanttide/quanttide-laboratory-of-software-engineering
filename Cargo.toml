@@ -14,6 +14,10 @@ repository = "https://github.com/quanttide/quanttide-laboratory-of-software-engi
 name = "llm-exp"
 path = "src/bin/llm_exp.rs"
 
+[[bin]]
+name = "chain-exp"
+path = "src/bin/chain_exp.rs"
+
 [dependencies]
 clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }

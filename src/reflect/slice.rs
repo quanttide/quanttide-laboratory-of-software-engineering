@@ -98,6 +98,23 @@ mod tests {
             // Acceptable — core function `backward_slice` is tested separately
         }
     }
+
+    #[test]
+    fn test_backward_slice_traces_through_method_chain() {
+        let code = "fn f() {\nlet raw = \"a,b,c\";\nlet parts: Vec<&str> = raw.split(',').collect();\nlet v = parts[2].trim();\n}";
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&tree_sitter_rust::LANGUAGE.into()).unwrap();
+        if let Some(tree) = parser.parse(code, None) {
+            // 从 L4 (parts[2].trim()) 追溯，应找到 L3 (parts 定义) 和 L2 (raw 定义)
+            let result = backward_slice(code, &tree, Path::new("f.rs"), 4);
+            assert!(result.iter().any(|s| s.line == 2 && s.text.contains("raw")),
+                "should trace from parts[2].trim() back to raw definition; got lines: {:?}",
+                result.iter().map(|s| s.line).collect::<Vec<_>>());
+            assert!(result.iter().any(|s| s.line == 3 && s.text.contains("parts")),
+                "should trace from parts[2].trim() back to parts definition; got lines: {:?}",
+                result.iter().map(|s| s.line).collect::<Vec<_>>());
+        }
+    }
 }
 
 fn walk_all<F: FnMut(tree_sitter::Node)>(node: &tree_sitter::Node, f: &mut F) {
@@ -346,7 +363,7 @@ fn extract_identifiers(node: &tree_sitter::Node, source: &[u8]) -> Vec<String> {
                     names.push(name.to_string());
                 }
             }
-            if child.is_named() && child.kind() != "call_expression" {
+            if child.is_named() {
                 names.extend(extract_identifiers(&child, source));
             }
             if !cursor.goto_next_sibling() { break; }
