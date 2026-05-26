@@ -22,7 +22,7 @@ reflect 工具 + LLM 组合的实验场。验证模式、评估质量、然后�
 
 ## 待验证
 
-- `analyse` 命令原型（定向分析，不跑 review）
+- `reflect` 命令原型（定向分析，不跑 review）
 
 ## 不做什么
 
