@@ -1,6 +1,0 @@
-code:
-  exclude:
-    - src/main.rs
-    - src/lib.rs
-    - src/**/mod.rs
-    - src/bin/
