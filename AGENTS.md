@@ -21,7 +21,7 @@ src/
 ├── lib.rs            模块入口
 ├── reflect/          确定性分析工具
 │   ├── mod.rs        SliceEntry, FlowEntry 类型
-│   ├── slice.rs      backward_slice, flatten_stmts, cross_function_slice
+│   ├── slice.rs      backward_slice, flatten_stmts
 │   └── dataflow.rs   trace_variable
 ├── llm.rs            DeepSeek LLM 客户端（从 Vault 读取密钥）
 └── bin/llm_exp.rs    reflect 与 LLM 的组合实验

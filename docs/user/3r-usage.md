@@ -97,7 +97,6 @@ dataflow × N（追踪多个变量路径）
 | `backward_slice` | ✅ 稳定 | 已测试 |
 | `flatten_stmts` | ✅ 稳定 | 已测试 |
 | `trace_variable` | ⚠️ 基本路径工作 | 已测试 |
-| `cross_function_slice` | ❌ 废弃 | 无测试 |
 | LLM prompt 模板 | ❌ 未注册 | 无 |
 
 ## 下一步

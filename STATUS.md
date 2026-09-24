@@ -52,6 +52,5 @@ reflect 工具 + LLM 组合的实验场。验证模式、评估质量、然后�
 
 - `trace_variable` 跨函数不工作
 - `call_graph` 统计含第三方库调用（虚高）
-- `cross_function_slice` 基本废弃
 - LLM 输出不稳定：同 prompt 不同调用可能不同结论
 - 没有自动化的 prompt 模板
